@@ -10,28 +10,18 @@ export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [name, setName] =
-    useState("");
-
-  const [email, setEmail] =
-    useState("");
-
-  const [password, setPassword] =
-    useState("");
-
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] =
     useState("");
-
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
   const submitHandler = async (e) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      toast.error(
-        "Passwords do not match"
-      );
+      toast.error("Passwords do not match");
       return;
     }
 
@@ -39,7 +29,7 @@ export default function SignupPage() {
       setLoading(true);
 
       const data = await apiFetch(
-        "/api/auth/signup",
+        "/api/auth/register",
         {
           method: "POST",
           body: JSON.stringify({
@@ -50,22 +40,20 @@ export default function SignupPage() {
         }
       );
 
-      login(data);
+      login(data.user, data.token);
 
       toast.success(
         "Account created successfully 🎉"
       );
 
-      if (data.role === "admin") {
+      if (data.user?.isAdmin) {
         router.push("/admin");
       } else {
         router.push("/");
       }
 
     } catch (error) {
-      toast.error(
-        error.message
-      );
+      toast.error(error.message);
 
     } finally {
       setLoading(false);
@@ -133,9 +121,7 @@ export default function SignupPage() {
             placeholder="Full Name"
             value={name}
             onChange={(e) =>
-              setName(
-                e.target.value
-              )
+              setName(e.target.value)
             }
             required
           />
@@ -145,9 +131,7 @@ export default function SignupPage() {
             placeholder="Email Address"
             value={email}
             onChange={(e) =>
-              setEmail(
-                e.target.value
-              )
+              setEmail(e.target.value)
             }
             required
           />
@@ -157,9 +141,7 @@ export default function SignupPage() {
             placeholder="Password"
             value={password}
             onChange={(e) =>
-              setPassword(
-                e.target.value
-              )
+              setPassword(e.target.value)
             }
             required
           />
