@@ -11,47 +11,45 @@ const errorHandler = require("./middlewares/errorMiddleware");
 
 const app = express();
 
-/* CORS */
+/* PUBLIC CORS FIX */
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "https://wateros.vercel.app",
-    ],
+    origin: true,
     credentials: true,
   })
 );
 
+/* PARSE JSON */
 app.use(express.json());
 
-/* Routes */
+/* API ROUTES */
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 
-/* Root test */
+/* ROOT ROUTE */
 app.get("/", (req, res) => {
   res.send("API Running...");
 });
 
-/* Error middleware */
+/* ERROR HANDLER */
 app.use(errorHandler);
 
-/* DB connection */
+/* DATABASE CONNECTION */
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("MongoDB Connected");
   } catch (error) {
-    console.error(error.message);
+    console.error("DB Error:", error.message);
     process.exit(1);
   }
 };
 
+/* SERVER START */
 const PORT = process.env.PORT || 5000;
 
-/* Start server */
 const startServer = async () => {
   await connectDB();
 
