@@ -1,65 +1,58 @@
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000";
+
 export async function apiFetch(
   endpoint,
   options = {}
 ) {
-  const API_URL =
-    "http://localhost:5000";
-
   const token =
     typeof window !== "undefined"
       ? localStorage.getItem("token")
       : null;
 
-  const response = await fetch(
+  const headers = {
+    "Content-Type":
+      "application/json",
+    ...(token && {
+      Authorization: `Bearer ${token}`,
+    }),
+    ...(options.headers || {}),
+  };
+
+  const res = await fetch(
     `${API_URL}${endpoint}`,
     {
       ...options,
-      headers: {
-        "Content-Type":
-          "application/json",
-        ...(token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {}),
-        ...(options.headers || {}),
-      },
+      headers,
     }
   );
 
   const contentType =
-    response.headers.get(
+    res.headers.get(
       "content-type"
     );
 
   if (
-    !contentType ||
-    !contentType.includes(
+    contentType &&
+    contentType.includes(
       "application/json"
     )
   ) {
-    const text =
-      await response.text();
+    const data =
+      await res.json();
 
-    console.error(
-      "NON JSON RESPONSE:",
-      text
-    );
+    if (!res.ok) {
+      throw new Error(
+        data.message ||
+          "Request failed"
+      );
+    }
 
-    throw new Error(
-      `Expected JSON but got ${contentType}`
-    );
+    return data;
   }
 
-  const data =
-    await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.message ||
-        "Request failed"
-    );
-  }
-
-  return data;
+  throw new Error(
+    "Expected JSON response"
+  );
 }
