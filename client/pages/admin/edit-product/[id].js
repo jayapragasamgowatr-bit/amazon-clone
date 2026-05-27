@@ -3,12 +3,10 @@ import { useRouter } from "next/router";
 import toast from "react-hot-toast";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { apiFetch } from "../../../lib/api";
-import { useAuth } from "../../../context/AuthContext";
 
 export default function EditProductPage() {
   const router = useRouter();
   const { id } = router.query;
-  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -20,21 +18,29 @@ export default function EditProductPage() {
   });
 
   useEffect(() => {
-    if (id) fetchProduct();
+    if (id) {
+      fetchProduct();
+    }
   }, [id]);
 
   const fetchProduct = async () => {
     try {
-      const product = await apiFetch(`/api/products/${id}`);
+      const product = await apiFetch(
+        `/api/products/${id}`
+      );
 
       setFormData({
         name: product.name || "",
         price: product.price || "",
-        description: product.description || "",
+        description:
+          product.description || "",
         image: product.image || "",
-        category: product.category || "",
-        countInStock: product.countInStock || "",
+        category:
+          product.category || "",
+        countInStock:
+          product.countInStock || "",
       });
+
     } catch (error) {
       toast.error(error.message);
     }
@@ -43,7 +49,8 @@ export default function EditProductPage() {
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]:
+        e.target.value,
     });
   };
 
@@ -51,15 +58,20 @@ export default function EditProductPage() {
     e.preventDefault();
 
     try {
-      await apiFetch(`/api/products/${id}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(formData),
-      });
+      await apiFetch(
+        `/api/products/${id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(
+            formData
+          ),
+        }
+      );
 
-      toast.success("Product updated");
+      toast.success(
+        "Product updated successfully"
+      );
+
       router.push("/admin");
 
     } catch (error) {
@@ -114,7 +126,9 @@ export default function EditProductPage() {
 
             <textarea
               name="description"
-              value={formData.description}
+              value={
+                formData.description
+              }
               onChange={handleChange}
               rows="5"
             />
@@ -135,7 +149,9 @@ export default function EditProductPage() {
 
             <input
               name="countInStock"
-              value={formData.countInStock}
+              value={
+                formData.countInStock
+              }
               onChange={handleChange}
               placeholder="Stock"
             />
