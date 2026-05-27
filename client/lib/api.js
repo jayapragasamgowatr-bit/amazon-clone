@@ -1,6 +1,6 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000";
+  "https://myshop-api-z6mr.onrender.com";
 
 export async function apiFetch(
   endpoint,
@@ -12,8 +12,7 @@ export async function apiFetch(
       : null;
 
   const headers = {
-    "Content-Type":
-      "application/json",
+    "Content-Type": "application/json",
     ...(token && {
       Authorization: `Bearer ${token}`,
     }),
@@ -29,30 +28,22 @@ export async function apiFetch(
   );
 
   const contentType =
-    res.headers.get(
-      "content-type"
-    );
+    res.headers.get("content-type");
 
   if (
     contentType &&
-    contentType.includes(
-      "application/json"
-    )
+    contentType.includes("application/json")
   ) {
-    const data =
-      await res.json();
+    const data = await res.json();
 
     if (!res.ok) {
       throw new Error(
-        data.message ||
-          "Request failed"
+        data.message || "Request failed"
       );
     }
 
     return data;
   }
 
-  throw new Error(
-    "Expected JSON response"
-  );
+  throw new Error("Expected JSON response");
 }
