@@ -3,12 +3,10 @@ import { useRouter } from "next/router";
 import toast from "react-hot-toast";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { apiFetch } from "../../lib/api";
-import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 
 export default function AddProductPage() {
   const router = useRouter();
-  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -28,7 +26,6 @@ export default function AddProductPage() {
     });
   };
 
-  // FILE UPLOAD
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
 
@@ -37,10 +34,10 @@ export default function AddProductPage() {
     const reader = new FileReader();
 
     reader.onloadend = () => {
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         image: reader.result,
-      });
+      }));
 
       toast.success("Image uploaded");
     };
@@ -54,10 +51,18 @@ export default function AddProductPage() {
     try {
       setLoading(true);
 
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        toast.error("Please login again");
+        router.push("/login");
+        return;
+      }
+
       await apiFetch("/api/products", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${user.token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: formData.name,
@@ -73,7 +78,8 @@ export default function AddProductPage() {
       router.push("/admin");
 
     } catch (error) {
-      toast.error(error.message);
+      console.error(error);
+      toast.error(error.message || "Failed to add product");
 
     } finally {
       setLoading(false);
@@ -90,14 +96,8 @@ export default function AddProductPage() {
         }}
       >
         <motion.div
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           className="glass-card"
           style={{
             padding: "40px",
@@ -147,11 +147,10 @@ export default function AddProductPage() {
               required
             />
 
-            {/* IMAGE URL */}
             <input
               type="text"
               name="image"
-              placeholder="Paste Image URL OR upload file below"
+              placeholder="Paste Image URL"
               value={
                 formData.image.startsWith("data:")
                   ? ""
@@ -160,7 +159,6 @@ export default function AddProductPage() {
               onChange={handleChange}
             />
 
-            {/* FILE UPLOAD */}
             <div>
               <label
                 style={{
@@ -176,13 +174,9 @@ export default function AddProductPage() {
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
-                style={{
-                  padding: "10px",
-                }}
               />
             </div>
 
-            {/* IMAGE PREVIEW */}
             {formData.image && (
               <div
                 style={{
@@ -195,13 +189,8 @@ export default function AddProductPage() {
                   style={{
                     maxWidth: "250px",
                     maxHeight: "250px",
-                    borderRadius: "16px",
                     objectFit: "contain",
-                    border:
-                      "1px solid rgba(255,255,255,0.1)",
-                    padding: "10px",
-                    background:
-                      "rgba(255,255,255,0.05)",
+                    borderRadius: "10px",
                   }}
                 />
               </div>
@@ -229,9 +218,7 @@ export default function AddProductPage() {
               type="submit"
               disabled={loading}
             >
-              {loading
-                ? "Adding..."
-                : "Add Product"}
+              {loading ? "Adding..." : "Add Product"}
             </button>
           </form>
         </motion.div>
