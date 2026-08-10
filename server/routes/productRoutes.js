@@ -1,4 +1,5 @@
 const express = require("express");
+
 const router = express.Router();
 
 const {
@@ -13,12 +14,34 @@ const {
 const protect = require("../middlewares/authMiddleware");
 const adminMiddleware = require("../middlewares/adminMiddleware");
 
-router.get("/suggestions", getSuggestions);
+// --------------------------------------------------
+// PUBLIC ROUTES
+// --------------------------------------------------
 
-router.get("/", getProducts);
+// Search suggestions
+router.get(
+  "/suggestions",
+  getSuggestions
+);
 
-router.get("/:id", getProductById);
+// Get all products
+router.get(
+  "/",
+  getProducts
+);
 
+// Get single product
+router.get(
+  "/:id",
+  getProductById
+);
+
+
+// --------------------------------------------------
+// ADMIN ROUTES
+// --------------------------------------------------
+
+// Create product
 router.post(
   "/",
   protect,
@@ -26,6 +49,7 @@ router.post(
   createProduct
 );
 
+// Update product
 router.put(
   "/:id",
   protect,
@@ -33,6 +57,7 @@ router.put(
   updateProduct
 );
 
+// Delete product
 router.delete(
   "/:id",
   protect,

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+
 import useCartStore from "../store/cartStore";
 import { useAuth } from "../context/AuthContext";
 import { useWishlist } from "../context/WishlistContext";
+
 
 function NavItem({
   href,
@@ -33,9 +35,96 @@ function NavItem({
   );
 }
 
+
+function CartIcon({
+  count,
+}) {
+  return (
+    <Link href="/cart">
+      <motion.div
+        whileHover={{
+          scale: 1.08,
+        }}
+        whileTap={{
+          scale: 0.95,
+        }}
+        style={{
+          position: "relative",
+          width: "48px",
+          height: "48px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          borderRadius: "14px",
+          background:
+            "rgba(255,255,255,0.08)",
+        }}
+      >
+
+        {/* CART ICON */}
+        <span
+          style={{
+            fontSize: "27px",
+            lineHeight: 1,
+          }}
+        >
+          🛒
+        </span>
+
+
+        {/* COUNT BADGE */}
+        {count > 0 && (
+          <span
+            style={{
+              position: "absolute",
+              top: "-5px",
+              right: "-5px",
+
+              minWidth: "22px",
+              height: "22px",
+
+              padding: "0 6px",
+
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+
+              borderRadius: "999px",
+
+              background:
+                "linear-gradient(135deg,#ef4444,#dc2626)",
+
+              color: "#ffffff",
+
+              fontSize: "12px",
+              fontWeight: "800",
+
+              border:
+                "2px solid #0a0f23",
+
+              boxShadow:
+                "0 4px 12px rgba(0,0,0,0.3)",
+            }}
+          >
+            {count > 99
+              ? "99+"
+              : count}
+          </span>
+        )}
+
+      </motion.div>
+    </Link>
+  );
+}
+
+
 export default function Header() {
-  const { user, logout } =
-    useAuth();
+
+  const {
+    user,
+    logout,
+  } = useAuth();
 
   const {
     wishlist,
@@ -47,14 +136,18 @@ export default function Header() {
   const [scrolled, setScrolled] =
     useState(false);
 
+
   const cartCount =
-    useCartStore((state) =>
-      mounted
-        ? state.getCartCount()
-        : 0
+    useCartStore(
+      (state) =>
+        mounted
+          ? state.getCartCount()
+          : 0
     );
 
+
   useEffect(() => {
+
     setMounted(true);
 
     const handleScroll =
@@ -69,14 +162,18 @@ export default function Header() {
       handleScroll
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         "scroll",
         handleScroll
       );
+    };
+
   }, []);
 
+
   return (
+
     <motion.header
       initial={{
         y: -80,
@@ -90,11 +187,13 @@ export default function Header() {
         position: "sticky",
         top: 0,
         zIndex: 9999,
+
         padding: scrolled
           ? "12px 28px"
           : "20px 36px",
       }}
     >
+
       <div
         style={{
           display: "flex",
@@ -102,16 +201,23 @@ export default function Header() {
             "space-between",
           alignItems:
             "center",
+
           flexWrap: "wrap",
           gap: "20px",
+
           borderRadius: "22px",
           padding: "16px 24px",
+
           background:
             "rgba(10,15,35,0.7)",
+
           backdropFilter:
             "blur(18px)",
         }}
       >
+
+        {/* LOGO */}
+
         <Link href="/">
           <div
             className="shimmer-text"
@@ -125,22 +231,32 @@ export default function Header() {
           </div>
         </Link>
 
+
+        {/* NAVIGATION */}
+
         <div
           style={{
             display: "flex",
+            alignItems: "center",
             gap: "10px",
             flexWrap: "wrap",
           }}
         >
+
           <NavItem
             href="/"
             label="Home"
           />
 
-          <NavItem
-            href="/cart"
-            label={`Cart (${cartCount})`}
+
+          {/* CART */}
+
+          <CartIcon
+            count={cartCount}
           />
+
+
+          {/* USER LINKS */}
 
           {user && (
             <>
@@ -161,6 +277,9 @@ export default function Header() {
             </>
           )}
 
+
+          {/* LOGIN */}
+
           {!user && (
             <>
               <NavItem
@@ -175,7 +294,9 @@ export default function Header() {
             </>
           )}
 
-          {/* ADMIN BUTTON */}
+
+          {/* ADMIN */}
+
           {user?.isAdmin && (
             <NavItem
               href="/admin"
@@ -183,15 +304,29 @@ export default function Header() {
             />
           )}
 
+
+          {/* LOGOUT */}
+
           {user && (
             <button
               onClick={logout}
+              style={{
+                padding:
+                  "10px 16px",
+                borderRadius:
+                  "14px",
+                fontWeight:
+                  "600",
+              }}
             >
               Logout
             </button>
           )}
+
         </div>
+
       </div>
+
     </motion.header>
   );
 }
