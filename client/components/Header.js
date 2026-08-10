@@ -227,7 +227,7 @@ export default function Header() {
               cursor: "pointer",
             }}
           >
-            Amazon Clone
+            Waventra Vetric
           </div>
         </Link>
 

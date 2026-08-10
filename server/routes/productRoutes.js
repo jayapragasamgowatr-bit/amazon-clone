@@ -11,37 +11,63 @@ const {
   deleteProduct,
 } = require("../controllers/productController");
 
+const {
+  createProductReview,
+  updateProductReview,
+  deleteProductReview,
+} = require("../controllers/reviewController");
+
 const protect = require("../middlewares/authMiddleware");
 const adminMiddleware = require("../middlewares/adminMiddleware");
 
 // --------------------------------------------------
-// PUBLIC ROUTES
+// PUBLIC PRODUCT ROUTES
 // --------------------------------------------------
 
-// Search suggestions
-router.get(
-  "/suggestions",
-  getSuggestions
-);
+router.get("/suggestions", getSuggestions);
 
-// Get all products
-router.get(
-  "/",
-  getProducts
-);
+router.get("/", getProducts);
 
-// Get single product
-router.get(
-  "/:id",
-  getProductById
-);
+router.get("/:id", getProductById);
 
 
 // --------------------------------------------------
-// ADMIN ROUTES
+// USER REVIEW
+// Logged-in users can add reviews
 // --------------------------------------------------
 
-// Create product
+router.post(
+  "/:id/reviews",
+  protect,
+  createProductReview
+);
+
+
+// --------------------------------------------------
+// ADMIN REVIEW MANAGEMENT
+// --------------------------------------------------
+
+// Admin edit review
+router.put(
+  "/:id/reviews/:reviewId",
+  protect,
+  adminMiddleware,
+  updateProductReview
+);
+
+// Admin delete review
+router.delete(
+  "/:id/reviews/:reviewId",
+  protect,
+  adminMiddleware,
+  deleteProductReview
+);
+
+
+// --------------------------------------------------
+// ADMIN PRODUCT MANAGEMENT
+// --------------------------------------------------
+
 router.post(
   "/",
   protect,
@@ -49,7 +75,6 @@ router.post(
   createProduct
 );
 
-// Update product
 router.put(
   "/:id",
   protect,
@@ -57,7 +82,6 @@ router.put(
   updateProduct
 );
 
-// Delete product
 router.delete(
   "/:id",
   protect,
