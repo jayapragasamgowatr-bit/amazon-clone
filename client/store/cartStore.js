@@ -85,7 +85,7 @@ const useCartStore = create(
       },
     }),
     {
-      name: "amazon-cart",
+      name: "Products-cart",
     }
   )
 );

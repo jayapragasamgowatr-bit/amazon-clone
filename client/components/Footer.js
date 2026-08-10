@@ -45,7 +45,7 @@ export default function Footer() {
                 "transparent",
             }}
           >
-            Amazon Clone
+            Waventra Vetric
           </motion.h2>
 
           <p
@@ -167,7 +167,7 @@ export default function Footer() {
           opacity: 0.65,
         }}
       >
-        © 2026 Amazon Clone.
+        © 2026 Waventra Vetric.
         Built with Next.js +
         Node.js + MongoDB.
       </div>
