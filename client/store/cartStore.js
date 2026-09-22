@@ -1,91 +1,103 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+const MAX_QUANTITY = 100;
+
+const clampQuantity = (quantity, stock) => {
+  const value = Number(quantity);
+  const safe = Number.isInteger(value) && value > 0 ? value : 1;
+  const stockLimit = Number.isFinite(Number(stock)) ? Math.max(1, Number(stock)) : MAX_QUANTITY;
+  return Math.min(safe, Math.min(MAX_QUANTITY, stockLimit));
+};
 
 const useCartStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       cart: [],
 
-      // ADD PRODUCT
-      addToCart: (product) => {
-        const existingItem = get().cart.find(
-          (item) => item._id === product._id
-        );
+      addToCart: (product, quantity = 1) => {
+        if (!product?._id) return;
 
-        if (existingItem) {
-          set({
-            cart: get().cart.map((item) =>
-              item._id === product._id
-                ? {
-                    ...item,
-                    quantity: item.quantity + 1,
-                  }
-                : item
-            ),
-          });
-        } else {
-          set({
+        set((state) => {
+          const existing = state.cart.find((item) => item._id === product._id);
+          const nextQuantity = clampQuantity(
+            (existing?.quantity || 0) + Number(quantity || 1),
+            product.countInStock
+          );
+
+          if (existing) {
+            return {
+              cart: state.cart.map((item) =>
+                item._id === product._id
+                  ? { ...item, quantity: nextQuantity }
+                  : item
+              ),
+            };
+          }
+
+          return {
             cart: [
-              ...get().cart,
+              ...state.cart,
               {
                 ...product,
-                quantity: 1,
+                _id: product._id || product.id,
+                quantity: clampQuantity(
+                  quantity,
+                  product.countInStock
+                ),
               },
             ],
-          });
-        }
-      },
-
-      // REMOVE PRODUCT
-      removeFromCart: (productId) => {
-        set({
-          cart: get().cart.filter(
-            (item) => item._id !== productId
-          ),
+          };
         });
       },
 
-      // UPDATE QUANTITY
-      updateQuantity: (productId, quantity) => {
-        set({
-          cart: get().cart.map((item) =>
+      removeFromCart: (productId) =>
+        set((state) => ({
+          cart: state.cart.filter((item) => item._id !== productId),
+        })),
+
+      updateQuantity: (productId, quantity) =>
+        set((state) => ({
+          cart: state.cart.map((item) =>
             item._id === productId
               ? {
                   ...item,
-                  quantity,
+                  quantity: clampQuantity(quantity, item.countInStock),
                 }
               : item
           ),
-        });
-      },
+        })),
 
-      // CLEAR CART
-      clearCart: () => {
-        set({
-          cart: [],
-        });
-      },
+      increaseQuantity: (productId) =>
+        set((state) => ({
+          cart: state.cart.map((item) =>
+            item._id === productId
+              ? {
+                  ...item,
+                  quantity: clampQuantity(
+                    Number(item.quantity || 1) + 1,
+                    item.countInStock
+                  ),
+                }
+              : item
+          ),
+        })),
 
-      // TOTAL ITEMS
-      getCartCount: () => {
-        return get().cart.reduce(
-          (total, item) =>
-            total + item.quantity,
-          0
-        );
-      },
+      decreaseQuantity: (productId) =>
+        set((state) => ({
+          cart: state.cart.map((item) =>
+            item._id === productId
+              ? { ...item, quantity: Math.max(1, Number(item.quantity || 1) - 1) }
+              : item
+          ),
+        })),
 
-      // TOTAL PRICE
-      getTotalPrice: () => {
-        return get().cart.reduce(
-          (total, item) =>
-            total + item.price * item.quantity,
-          0
-        );
-      },
+      clearCart: () => set({ cart: [] }),
     }),
     {
-      name: "Products-cart",
+      name: "gowatr-cart",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ cart: state.cart }),
     }
   )
 );

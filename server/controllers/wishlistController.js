@@ -1,131 +1,157 @@
-const Wishlist =
-  require("../models/Wishlist");
+const User = require("../models/User");
+const Product = require("../models/Product");
 
-const getWishlist =
-  async (
-    req,
-    res,
-    next
-  ) => {
-    try {
-      const wishlist =
-        await Wishlist.findOne({
-          user:
-            req.user._id,
-        }).populate(
-          "products"
-        );
 
-      res.json(
-        wishlist
-          ? wishlist.products
-          : []
-      );
-    } catch (error) {
-      next(error);
+/*
+|--------------------------------------------------------------------------
+| GET WISHLIST
+|--------------------------------------------------------------------------
+| GET /api/wishlist
+|--------------------------------------------------------------------------
+*/
+const getWishlist = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .populate("wishlist");
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
-  };
 
-const addToWishlist =
-  async (
-    req,
-    res,
-    next
-  ) => {
-    try {
-      const {
-        productId,
-      } = req.body;
+    const wishlist = Array.isArray(user.wishlist)
+      ? user.wishlist
+      : [];
 
-      let wishlist =
-        await Wishlist.findOne({
-          user:
-            req.user._id,
-        });
+    return res.status(200).json({
+      wishlist,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-      if (!wishlist) {
-        wishlist =
-          await Wishlist.create({
-            user:
-              req.user._id,
-            products: [
-              productId,
-            ],
-          });
-      } else {
-        if (
-          !wishlist.products.some(
-            (id) =>
-              id.toString() ===
-              productId
-          )
-        ) {
-          wishlist.products.push(
-            productId
-          );
 
-          await wishlist.save();
-        }
-      }
+/*
+|--------------------------------------------------------------------------
+| ADD TO WISHLIST
+|--------------------------------------------------------------------------
+| POST /api/wishlist
+|--------------------------------------------------------------------------
+*/
+const addToWishlist = async (req, res, next) => {
+  try {
+    const { productId } = req.body;
 
-      const updated =
-        await Wishlist.findOne({
-          user:
-            req.user._id,
-        }).populate(
-          "products"
-        );
-
-      res.json(
-        updated.products
-      );
-    } catch (error) {
-      next(error);
+    if (!productId) {
+      return res.status(400).json({
+        message: "Product ID is required",
+      });
     }
-  };
 
-const removeFromWishlist =
-  async (
-    req,
-    res,
-    next
-  ) => {
-    try {
-      const wishlist =
-        await Wishlist.findOne({
-          user:
-            req.user._id,
-        });
+    const product = await Product.findById(productId);
 
-      if (!wishlist) {
-        return res.json([]);
-      }
-
-      wishlist.products =
-        wishlist.products.filter(
-          (id) =>
-            id.toString() !==
-            req.params
-              .productId
-        );
-
-      await wishlist.save();
-
-      const updated =
-        await Wishlist.findOne({
-          user:
-            req.user._id,
-        }).populate(
-          "products"
-        );
-
-      res.json(
-        updated.products
-      );
-    } catch (error) {
-      next(error);
+    if (!product) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
     }
-  };
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (!Array.isArray(user.wishlist)) {
+      user.wishlist = [];
+    }
+
+    const alreadyExists = user.wishlist.some(
+      (id) => id.toString() === productId.toString()
+    );
+
+    if (alreadyExists) {
+      return res.status(200).json({
+        message: "Product already in wishlist",
+        wishlist: user.wishlist,
+      });
+    }
+
+    user.wishlist.push(productId);
+
+    await user.save();
+
+    const updatedUser = await User.findById(
+      req.user._id
+    ).populate("wishlist");
+
+    return res.status(200).json({
+      message: "Product added to wishlist",
+      wishlist: updatedUser.wishlist,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| REMOVE FROM WISHLIST
+|--------------------------------------------------------------------------
+| DELETE /api/wishlist/:productId
+|--------------------------------------------------------------------------
+*/
+const removeFromWishlist = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({
+        message: "Product ID is required",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (!Array.isArray(user.wishlist)) {
+      user.wishlist = [];
+    }
+
+    user.wishlist = user.wishlist.filter(
+      (id) =>
+        id.toString() !== productId.toString()
+    );
+
+    await user.save();
+
+    const updatedUser = await User.findById(
+      req.user._id
+    ).populate("wishlist");
+
+    return res.status(200).json({
+      message: "Product removed from wishlist",
+      wishlist: updatedUser.wishlist,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 module.exports = {
   getWishlist,

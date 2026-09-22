@@ -1,107 +1,139 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import toast from "react-hot-toast";
 
 export default function Login() {
   const router = useRouter();
+
   const { login } = useAuth();
 
-  const [email, setEmail] =
-    useState("");
-
-  const [password, setPassword] =
-    useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const [loading, setLoading] =
     useState(false);
 
+  // ============================================================
+  // LOGIN
+  // ============================================================
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+      alert("Please enter your email.");
+      return;
+    }
+
+    if (!password) {
+      alert("Please enter your password.");
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const data = await apiFetch(
-        "/api/auth/login",
+      console.log(
+        "LOGIN FORM:",
         {
-          method: "POST",
-          body: JSON.stringify({
-            email,
-            password,
-          }),
+          email: cleanEmail,
+          passwordEntered: !!password,
         }
       );
 
+      // IMPORTANT
+      await login(
+        cleanEmail,
+        password
+      );
+
       console.log(
-        "LOGIN RESPONSE:",
-        data
+        "LOGIN SUCCESS"
       );
 
-      const fixedUser = {
-        ...data.user,
-        isAdmin:
-          data.user.isAdmin ||
-          data.user.email ===
-            "admin@gmail.com",
-      };
+      router.push("/");
 
-      login(
-        fixedUser,
-        data.token
-      );
-
-      toast.success(
-        "Logged in successfully"
-      );
-
-      if (fixedUser.isAdmin) {
-        router.push("/admin");
-      } else {
-        router.push("/");
-      }
     } catch (error) {
-      toast.error(
-        error.message ||
-          "Login failed"
+      console.error(
+        "LOGIN PAGE ERROR:",
+        error
       );
+
+      alert(
+        error?.message ||
+        "Login failed"
+      );
+
     } finally {
       setLoading(false);
     }
   };
 
+  // ============================================================
+  // UI
+  // ============================================================
+
   return (
     <div
-      className="glass-card"
       style={{
-        maxWidth: "420px",
-        margin: "100px auto",
-        padding: "32px",
-        borderRadius: "20px",
+        minHeight:
+          "calc(100vh - 80px)",
+
+        display: "flex",
+
+        alignItems: "center",
+
+        justifyContent:
+          "center",
+
+        padding: "30px",
       }}
     >
-      <h1
+      <form
+        onSubmit={handleSubmit}
+        className="glass-card"
         style={{
-          textAlign: "center",
-          marginBottom: "24px",
-          fontSize: "32px",
-          fontWeight: "800",
+          width: "100%",
+          maxWidth: "430px",
+          padding: "35px",
+          background:
+            "rgba(7,20,38,0.78)",
         }}
       >
-        Login
-      </h1>
+        <h1
+          style={{
+            fontSize: "32px",
+            fontWeight: 900,
+            marginBottom: "25px",
+          }}
+        >
+          Login
+        </h1>
 
-      <form onSubmit={handleSubmit}>
+        {/* EMAIL */}
+
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) =>
-            setEmail(e.target.value)
+            setEmail(
+              e.target.value
+            )
           }
           required
+          autoComplete="email"
+          style={{
+            width: "100%",
+            marginBottom: "15px",
+            boxSizing:
+              "border-box",
+          }}
         />
+
+        {/* PASSWORD */}
 
         <input
           type="password"
@@ -113,20 +145,22 @@ export default function Login() {
             )
           }
           required
+          autoComplete="current-password"
           style={{
-            marginTop: "14px",
+            width: "100%",
+            marginBottom: "20px",
+            boxSizing:
+              "border-box",
           }}
         />
+
+        {/* LOGIN */}
 
         <button
           type="submit"
           disabled={loading}
           style={{
-            marginTop: "18px",
             width: "100%",
-            opacity: loading
-              ? 0.7
-              : 1,
           }}
         >
           {loading

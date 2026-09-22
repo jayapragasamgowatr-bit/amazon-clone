@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+.DS_Store
+
+# Local backups and archives
+*.zip
+*.rar
+*.7z
+*.backup
+
+# Local archives and backups
+*.zip
+*.rar
+*.7z
+*.backup

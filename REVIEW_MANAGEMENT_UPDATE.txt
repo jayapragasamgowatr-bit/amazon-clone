@@ -1,0 +1,25 @@
+Waventra Vetric - Admin Review Management Update
+
+Files included:
+client/pages/admin/products.js
+client/pages/admin/reviews.js
+client/lib/api.js
+server/routes/productRoutes.js
+
+What changed:
+1. Admin Products now has a "Reviews" link in each product row.
+2. Clicking Reviews opens /admin/reviews?product=<productId>.
+3. Admin Reviews page loads the selected product and its customer reviews.
+4. Each review has Edit and Delete actions.
+5. Edit opens a modal for rating (1-5) and comment (max 1000 chars).
+6. Product rating and review count are recalculated by the existing backend controller.
+7. Review update/delete routes are now protected by BOTH protect and adminOnly.
+8. Customer review creation remains protected by login only.
+
+Install:
+Extract the ZIP over your project and replace the listed files.
+Do not replace any .env files.
+Restart both client and server after replacement.
+
+Direct page:
+http://localhost:3000/admin/reviews

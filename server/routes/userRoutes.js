@@ -1,37 +1,98 @@
 const express = require("express");
+
 const router = express.Router();
 
+
+// ======================================================
+// MIDDLEWARE
+// ======================================================
+
 const {
-  signup,
-  login,
-  getWishlist,
-  toggleWishlist,
+  protect,
+  adminOnly,
+} = require("../middlewares/authMiddleware");
+
+
+// ======================================================
+// CONTROLLERS
+// ======================================================
+
+const {
+  getUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+  updateUserRole,
 } = require("../controllers/userController");
 
-const {
-  protect,
-} = require("../middleware/authMiddleware");
 
-router.post(
-  "/signup",
-  signup
-);
-
-router.post(
-  "/login",
-  login
-);
+// ======================================================
+// GET ALL USERS
+// GET /api/users
+// ======================================================
 
 router.get(
-  "/wishlist",
+  "/",
   protect,
-  getWishlist
+  adminOnly,
+  getUsers
 );
 
-router.post(
-  "/wishlist",
+
+// ======================================================
+// GET ONE USER
+// GET /api/users/:id
+// ======================================================
+
+router.get(
+  "/:id",
   protect,
-  toggleWishlist
+  adminOnly,
+  getUserById
 );
+
+
+// ======================================================
+// UPDATE USER
+// PUT /api/users/:id
+// ======================================================
+
+router.put(
+  "/:id",
+  protect,
+  adminOnly,
+  updateUser
+);
+
+
+// ======================================================
+// UPDATE USER ROLE
+// PUT /api/users/:id/role
+// ======================================================
+
+router.put(
+  "/:id/role",
+  protect,
+  adminOnly,
+  updateUserRole
+);
+
+
+// ======================================================
+// DELETE USER
+// DELETE /api/users/:id
+// ======================================================
+
+router.delete(
+  "/:id",
+  protect,
+  adminOnly,
+  deleteUser
+);
+
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 module.exports = router;

@@ -1,0 +1,14 @@
+const express=require("express");
+const {optionalProtect,protect,adminOnly}=require("../middlewares/authMiddleware");
+const {createRateLimiter}=require("../middlewares/rateLimitMiddleware");
+const {getAssistant}=require("../controllers/aiAssistantController");
+const {getCopilot}=require("../controllers/adminCopilotController");
+const {getCustomerAI}=require("../controllers/customerIntelligenceAIController");
+const {getBusinessIntelligence,askBusinessIntelligence}=require("../controllers/businessIntelligenceController");
+const router=express.Router();
+router.post("/assistant",optionalProtect,createRateLimiter({windowMs:60000,max:30,message:"Too many assistant requests."}),getAssistant);
+router.get("/admin/copilot",protect,adminOnly,getCopilot);
+router.get("/admin/customer/:userId",protect,adminOnly,getCustomerAI);
+router.get("/admin/business-intelligence",protect,adminOnly,getBusinessIntelligence);
+router.post("/admin/business-intelligence/ask",protect,adminOnly,askBusinessIntelligence);
+module.exports=router;

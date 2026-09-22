@@ -7,22 +7,29 @@ export default function ProtectedRoute({
   adminOnly = false,
 }) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+
+  const {
+    user,
+    loading,
+  } = useAuth();
 
   useEffect(() => {
     if (loading) return;
 
     if (!user) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
+    const isAdmin =
+      user.role === "admin" ||
+      user.isAdmin === true;
+
     if (
       adminOnly &&
-      !user?.isAdmin
+      !isAdmin
     ) {
-      router.push("/");
-      return;
+      router.replace("/");
     }
   }, [
     user,
@@ -31,13 +38,17 @@ export default function ProtectedRoute({
     router,
   ]);
 
-  if (loading) {
+  if (
+    loading ||
+    !user
+  ) {
     return (
       <div
         style={{
-          padding: "80px",
-          textAlign: "center",
-          fontSize: "20px",
+          minHeight: "60vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         Loading...
@@ -45,11 +56,13 @@ export default function ProtectedRoute({
     );
   }
 
-  if (!user) return null;
+  const isAdmin =
+    user.role === "admin" ||
+    user.isAdmin === true;
 
   if (
     adminOnly &&
-    !user?.isAdmin
+    !isAdmin
   ) {
     return null;
   }

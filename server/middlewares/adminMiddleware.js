@@ -1,10 +1,3 @@
-const adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
-    next();
-  } else {
-    res.status(403);
-    throw new Error("Admin access only");
-  }
-};
-
+// Backward-compatible export. New code should import adminOnly from authMiddleware.
+const { adminOnly } = require("./authMiddleware");
 module.exports = adminOnly;

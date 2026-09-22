@@ -1,4 +1,5 @@
 import {
+  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
@@ -33,11 +34,8 @@ export default function SalesChart({ data }) {
           overflow: "hidden",
         }}
       >
-        <LineChart
-          width={900}
-          height={350}
-          data={data}
-        >
+        <ResponsiveContainer width="100%" height={350}>
+          <LineChart data={data}>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke="rgba(255,255,255,0.08)"
@@ -68,7 +66,8 @@ export default function SalesChart({ data }) {
             strokeWidth={4}
             dot={{ r: 6 }}
           />
-        </LineChart>
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

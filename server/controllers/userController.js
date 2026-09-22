@@ -1,175 +1,237 @@
-const bcrypt = require("bcryptjs");
 const User = require("../models/User");
-const generateToken = require("../utils/generateToken");
+const Order = require("../models/Order");
 
-const signup = async (
-  req,
-  res,
-  next
-) => {
+// ======================================================
+// GET ALL USERS
+// GET /api/auth/users
+// ======================================================
+const getUsers = async (req, res, next) => {
   try {
-    const {
-      name,
-      email,
-      password,
-    } = req.body;
+    const users = await User.find({})
+      .select("-password")
+      .sort({ createdAt: -1 });
 
-    const userExists =
-      await User.findOne({
-        email,
-      });
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
+};
 
-    if (userExists) {
-      res.status(400);
-      throw new Error(
-        "User already exists"
+// ======================================================
+// GET ONE USER
+// GET /api/auth/users/:id
+// ======================================================
+const getUserById = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select("-password")
+      .lean();
+
+    if (!user) {
+      res.status(404);
+      throw new Error("User not found");
+    }
+
+    // Get orders belonging to this customer
+    let orders = [];
+
+    try {
+      orders = await Order.find({
+        user: req.params.id,
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+    } catch (orderError) {
+      console.error(
+        "ORDER FETCH ERROR:",
+        orderError.message
       );
     }
 
-    const hashedPassword =
-      await bcrypt.hash(
-        password,
-        10
-      );
-
-    const user =
-      await User.create({
-        name,
-        email,
-        password:
-          hashedPassword,
-      });
-
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(
-        user._id,
-        user.role
-      ),
+    res.json({
+      user,
+      orders,
     });
   } catch (error) {
     next(error);
   }
 };
 
-const login = async (
-  req,
-  res,
-  next
-) => {
+// ======================================================
+// UPDATE USER
+// PUT /api/auth/users/:id
+// ======================================================
+const updateUser = async (req, res, next) => {
   try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      res.status(404);
+      throw new Error("User not found");
+    }
+
     const {
+      name,
       email,
-      password,
     } = req.body;
 
-    const user =
-      await User.findOne({
-        email,
-      });
-
-    if (
-      user &&
-      (await bcrypt.compare(
-        password,
-        user.password
-      ))
-    ) {
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(
-          user._id,
-          user.role
-        ),
-      });
-    } else {
-      res.status(401);
-      throw new Error(
-        "Invalid credentials"
-      );
+    if (name !== undefined) {
+      user.name = name;
     }
-  } catch (error) {
-    next(error);
-  }
-};
 
-const getWishlist = async (
-  req,
-  res,
-  next
-) => {
-  try {
-    const user =
-      await User.findById(
-        req.user._id
-      ).populate(
-        "wishlist"
-      );
-
-    res.json(user.wishlist);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const toggleWishlist = async (
-  req,
-  res,
-  next
-) => {
-  try {
-    const { productId } =
-      req.body;
-
-    const user =
-      await User.findById(
-        req.user._id
-      );
-
-    const exists =
-      user.wishlist.includes(
-        productId
-      );
-
-    if (exists) {
-      user.wishlist =
-        user.wishlist.filter(
-          (id) =>
-            id.toString() !==
-            productId
-        );
-    } else {
-      user.wishlist.push(
-        productId
-      );
+    if (email !== undefined) {
+      user.email = email;
     }
 
     await user.save();
 
-    const updatedUser =
-      await User.findById(
-        req.user._id
-      ).populate(
-        "wishlist"
-      );
-
-    res.json(
-      updatedUser.wishlist
-    );
+    res.json({
+      message: "User updated successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        createdAt: user.createdAt,
+      },
+    });
   } catch (error) {
     next(error);
   }
 };
 
+// ======================================================
+// UPDATE USER ROLE
+// PUT /api/auth/users/:id/role
+// ======================================================
+const updateUserRole = async (req, res, next) => {
+  try {
+    const {
+      role,
+    } = req.body;
+
+    // Validate role
+    if (!["user", "admin"].includes(role)) {
+      res.status(400);
+      throw new Error("Invalid role");
+    }
+
+    const user = await User.findById(
+      req.params.id
+    );
+
+    if (!user) {
+      res.status(404);
+      throw new Error("User not found");
+    }
+
+    // Prevent admin from removing own admin access
+    if (
+      req.user._id.toString() ===
+        user._id.toString() &&
+      role !== "admin"
+    ) {
+      res.status(400);
+      throw new Error(
+        "You cannot remove your own admin access"
+      );
+    }
+
+    // Update role
+    user.role = role;
+
+    // Keep isAdmin synchronized
+    user.isAdmin =
+      role === "admin";
+
+    await user.save();
+
+    res.json({
+      message:
+        role === "admin"
+          ? "Admin access granted successfully"
+          : "Admin access removed successfully",
+
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ======================================================
+// DELETE USER
+// DELETE /api/auth/users/:id
+// ======================================================
+const deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(
+      req.params.id
+    );
+
+    if (!user) {
+      res.status(404);
+      throw new Error("User not found");
+    }
+
+    // Prevent deleting yourself
+    if (
+      req.user._id.toString() ===
+      user._id.toString()
+    ) {
+      res.status(400);
+      throw new Error(
+        "You cannot delete your own account"
+      );
+    }
+
+    // Prevent deleting another admin
+    if (
+      user.role === "admin" ||
+      user.isAdmin === true
+    ) {
+      res.status(400);
+      throw new Error(
+        "Admin accounts cannot be deleted from customer management"
+      );
+    }
+
+    await User.findByIdAndDelete(
+      req.params.id
+    );
+
+    // Optional: delete customer's orders
+    // Only enable this if you want orders deleted
+    // together with the customer.
+    //
+    // await Order.deleteMany({
+    //   user: req.params.id,
+    // });
+
+    res.json({
+      message:
+        "Customer deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ======================================================
+// EXPORT
+// ======================================================
 module.exports = {
-  signup,
-  login,
-  getWishlist,
-  toggleWishlist,
+  getUsers,
+  getUserById,
+  updateUser,
+  updateUserRole,
+  deleteUser,
 };

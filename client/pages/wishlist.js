@@ -4,6 +4,8 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { useWishlist } from "../context/WishlistContext";
 import useCartStore from "../store/cartStore";
 import { Heart, ShoppingCart } from "lucide-react";
+import SEO from "../components/SEO";
+import { trackEvent } from "../lib/eventTracker";
 
 export default function WishlistPage() {
   const {
@@ -17,6 +19,7 @@ export default function WishlistPage() {
 
   return (
     <ProtectedRoute>
+      <SEO title="My Wishlist | Waventra Vetric" description="Your saved Waventra Vetric products." path="/wishlist" noIndex />
       <div
         style={{
           maxWidth: "1500px",
@@ -105,11 +108,18 @@ export default function WishlistPage() {
                     whileTap={{
                       scale: 0.9,
                     }}
-                    onClick={() =>
+                    onClick={() => {
                       toggleWishlist(
                         product._id
-                      )
-                    }
+                      );
+                      trackEvent("wishlist_remove", {
+                        productId: product._id,
+                        category: product.category,
+                        metadata: {
+                          source: "wishlist_page",
+                        },
+                      });
+                    }}
                     style={{
                       position:
                         "absolute",
@@ -194,6 +204,12 @@ export default function WishlistPage() {
                     }
                   </p>
 
+                  <div style={{ marginTop: "8px", fontSize: "13px", opacity: 0.7 }}>
+                    {Number(product.countInStock || 0) > 0
+                      ? `${product.countInStock} in stock`
+                      : "Out of stock"}
+                  </div>
+
                   {/* ACTIONS */}
                   <div
                     style={{
@@ -205,12 +221,14 @@ export default function WishlistPage() {
                     }}
                   >
                     <button
-                      onClick={() =>
-                        addToCart(
-                          product
-                        )
-                      }
+                      disabled={Number(product.countInStock || 0) <= 0}
+                      onClick={() => {
+                        if (Number(product.countInStock || 0) <= 0) return;
+                        addToCart(product);
+                      }}
                       style={{
+                        opacity: Number(product.countInStock || 0) <= 0 ? 0.5 : 1,
+                        cursor: Number(product.countInStock || 0) <= 0 ? "not-allowed" : "pointer",
                         display:
                           "flex",
                         alignItems:
