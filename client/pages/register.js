@@ -30,54 +30,79 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-cyan-950 px-4 py-12">
       <form
         onSubmit={handleRegister}
-        className="bg-white p-8 rounded shadow w-96"
+        className="w-full max-w-md rounded-3xl border border-slate-700/70 bg-slate-900/90 p-8 shadow-2xl backdrop-blur"
       >
-        <h1 className="text-3xl font-bold mb-6 text-center">
+        <h1 className="mb-8 text-center text-4xl font-bold text-white">
           Register
         </h1>
 
-        <input
-          type="text"
-          placeholder="Name"
-          value={name}
-          onChange={(e) =>
-            setName(e.target.value)
-          }
-          className="w-full border p-3 rounded mb-4"
-          required
-        />
+        <div className="space-y-5">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-300">
+              Name
+            </label>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) =>
-            setEmail(e.target.value)
-          }
-          className="w-full border p-3 rounded mb-4"
-          required
-        />
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-2xl border border-slate-600 bg-slate-800/80 px-5 py-4 text-white placeholder-slate-400 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              required
+            />
+          </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) =>
-            setPassword(e.target.value)
-          }
-          className="w-full border p-3 rounded mb-4"
-          required
-        />
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-300">
+              Email
+            </label>
 
-        <button
-          type="submit"
-          className="w-full bg-black text-white p-3 rounded"
-        >
-          Register
-        </button>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-2xl border border-slate-600 bg-slate-800/80 px-5 py-4 text-white placeholder-slate-400 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-300">
+              Password
+            </label>
+
+            <input
+              type="password"
+              placeholder="Create a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-2xl border border-slate-600 bg-slate-800/80 px-5 py-4 text-white placeholder-slate-400 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-violet-500 py-4 text-lg font-bold text-white shadow-lg transition hover:scale-[1.01] hover:from-cyan-400 hover:to-violet-400"
+          >
+            Register
+          </button>
+        </div>
+
+        <p className="mt-6 text-center text-sm text-slate-400">
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="font-semibold text-cyan-400 transition hover:text-cyan-300"
+          >
+            Login
+          </button>
+        </p>
       </form>
     </div>
   );
