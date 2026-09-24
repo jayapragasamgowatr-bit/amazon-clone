@@ -258,6 +258,28 @@ button::before {
   transition: left 0.6s ease;
 
   pointer-events: none;
+  z-index: 0;
+}
+
+/* Keep button content and icons above the shimmer layer. */
+button > *,
+button svg,
+a > svg,
+[role="button"] > svg {
+  position: relative;
+  z-index: 1;
+}
+
+/* Icon-only and control buttons should never hide their icons. */
+.icon-button::before,
+.quantity-control button::before {
+  display: none !important;
+}
+
+.icon-button,
+.quantity-control button,
+.wishlist-button {
+  isolation: isolate;
 }
 
 button:hover::before {
@@ -808,6 +830,45 @@ a,
 button,
 [role="button"] {
   cursor: pointer;
+}
+
+/* =========================================================
+   ICON VISIBILITY
+========================================================= */
+
+button svg,
+a svg,
+[role="button"] svg {
+  display: inline-block !important;
+  width: 1.15em;
+  height: 1.15em;
+  min-width: 1.15em;
+  min-height: 1.15em;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  visibility: visible !important;
+  opacity: 1 !important;
+  stroke: currentColor !important;
+  fill: none;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
+}
+
+.quantity-control button svg,
+.wishlist-button svg,
+.icon-button svg {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  stroke: currentColor !important;
+  fill: none;
+  position: relative;
+  z-index: 3;
+}
+
+.wishlist-button svg[fill]:not([fill="transparent"]) {
+  fill: currentColor !important;
 }
 
 input,

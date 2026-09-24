@@ -966,6 +966,8 @@ export default function AdminUsersPage() {
           .role-select:disabled { opacity: .5; }
           .actions { display: flex; gap: 7px; }
           .icon-button {
+            position: relative;
+            z-index: 2;
             width: 35px;
             height: 35px;
             display: flex;
@@ -976,6 +978,23 @@ export default function AdminUsersPage() {
             background: rgba(255,255,255,.035);
             cursor: pointer;
           }
+          .icon-button::before {
+            display: none !important;
+          }
+          .icon-button svg {
+            position: relative;
+            z-index: 3;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            stroke: currentColor !important;
+            flex-shrink: 0;
+          }
+          .icon-button.view { color: #67e8f9 !important; }
+          .icon-button.edit { color: #c4b5fd !important; }
+          .icon-button.delete { color: #fca5a5 !important; }
+          .icon-button:disabled { opacity: .45; cursor: not-allowed; }
+
           .icon-button.view { color: #67e8f9; }
           .icon-button.edit { color: #93c5fd; }
           .icon-button.delete { color: #f87171; }

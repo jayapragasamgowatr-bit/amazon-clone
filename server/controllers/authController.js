@@ -1,7 +1,9 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { EMAIL_RE, validateRegistration } = require("../utils/validation");
 const generateToken = require("../utils/generateToken");
+const { sendPasswordResetEmail } = require("../utils/emailService");
 
 // ============================================================
 // REGISTER USER
@@ -218,6 +220,129 @@ const loginUser = async (req, res, next) => {
       // Centralized JWT generator.
       // Token lifetime = 7 days.
       token: generateToken(user._id, user.role),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+// ============================================================
+// FORGOT PASSWORD
+// POST /api/auth/forgot-password
+// ============================================================
+
+const forgotPassword = async (req, res, next) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+
+    if (!email || !EMAIL_RE.test(email) || email.length > 254) {
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists for this email, a password reset link has been sent.",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Always return the same response to avoid revealing
+    // whether an email address belongs to an account.
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists for this email, a password reset link has been sent.",
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(
+      Date.now() + 15 * 60 * 1000
+    );
+
+    await user.save();
+
+    try {
+      await sendPasswordResetEmail(user, rawToken);
+    } catch (emailError) {
+      // Do not leave a usable reset token if email delivery failed.
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+
+      console.error(
+        "PASSWORD RESET EMAIL FAILED:",
+        emailError?.message || emailError
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "If an account exists for this email, a password reset link has been sent.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// RESET PASSWORD
+// POST /api/auth/reset-password
+// ============================================================
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+    const newPassword = String(req.body?.password || "");
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset token and new password are required.",
+      });
+    }
+
+    if (newPassword.length < 6 || newPassword.length > 128) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be between 6 and 128 characters.",
+      });
+    }
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: {
+        $gt: new Date(),
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "This password reset link is invalid or has expired.",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now log in.",
     });
   } catch (error) {
     next(error);
@@ -545,6 +670,8 @@ const getMe = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  forgotPassword,
+  resetPassword,
   getUsers,
   getUserById,
   updateUser,

@@ -847,6 +847,8 @@ export default function ProductDetails() {
               <div className="quantity-control">
                 <button
                   type="button"
+                  className="quantity-button"
+                  aria-label="Decrease quantity"
                   disabled={
                     quantity <= 1
                   }
@@ -865,6 +867,8 @@ export default function ProductDetails() {
 
                 <button
                   type="button"
+                  className="quantity-button"
+                  aria-label="Increase quantity"
                   disabled={
                     quantity >=
                     maxQuantity
@@ -903,7 +907,7 @@ export default function ProductDetails() {
 
             <button
               type="button"
-              className="wishlist-button"
+              className="wishlist-button icon-action-button"
               onClick={
                 handleWishlist
               }
@@ -1545,6 +1549,8 @@ export default function ProductDetails() {
         }
 
         .quantity-control button {
+          position: relative;
+          z-index: 2;
           width: 34px;
           height: 34px;
           border: none;
@@ -1602,6 +1608,9 @@ export default function ProductDetails() {
         }
 
         .wishlist-button {
+          position: relative;
+          z-index: 2;
+          overflow: hidden;
           background: rgba(
             255,
             255,
@@ -1616,6 +1625,22 @@ export default function ProductDetails() {
               255,
               0.12
             );
+        }
+
+        .quantity-button svg,
+        .wishlist-button svg {
+          display: block !important;
+          position: relative;
+          z-index: 5;
+          visibility: visible !important;
+          opacity: 1 !important;
+          flex: 0 0 auto;
+          stroke: currentColor !important;
+        }
+
+        .quantity-button::before,
+        .wishlist-button::before {
+          display: none !important;
         }
 
         .benefits {

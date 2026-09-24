@@ -1046,10 +1046,74 @@ ${reason}
 |--------------------------------------------------------------------------
 */
 
+const sendPasswordResetEmail = async (user, rawToken) => {
+  const email = String(user?.email || "").trim().toLowerCase();
+
+  if (!email) {
+    throw new Error("User email is missing");
+  }
+
+  const frontendUrl = String(
+    process.env.CLIENT_URL ||
+      process.env.FRONTEND_URL ||
+      ""
+  )
+    .split(",")[0]
+    .trim()
+    .replace(/\/$/, "");
+
+  if (!frontendUrl) {
+    throw new Error("CLIENT_URL is not configured");
+  }
+
+  const resetUrl =
+    `${frontendUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+  const customerName = escapeHtml(user?.name || "Customer");
+
+  const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Password Reset</title>
+</head>
+<body style="margin:0;padding:20px;background:#f5f7fa;font-family:Arial,sans-serif;">
+  <div style="max-width:650px;margin:auto;background:#ffffff;padding:30px;border-radius:12px;">
+    <h1 style="color:#0284c7;">Reset Your Password</h1>
+    <p>Hello <strong>${customerName}</strong>,</p>
+    <p>We received a request to reset your Waventra Vetric account password.</p>
+    <p>
+      <a
+        href="${escapeHtml(resetUrl)}"
+        style="display:inline-block;padding:13px 22px;border-radius:8px;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:700;"
+      >
+        Reset Password
+      </a>
+    </p>
+    <p>This link will expire in <strong>15 minutes</strong>.</p>
+    <p>If you did not request a password reset, you can safely ignore this email.</p>
+    <hr>
+    <p style="color:#777;font-size:12px;">Waventra Vetric</p>
+  </div>
+</body>
+</html>
+`;
+
+  return sendEmail({
+    to: email,
+    toName: user?.name || "Customer",
+    subject: "Reset Your Waventra Vetric Password",
+    html,
+    text: `Reset your Waventra Vetric password: ${resetUrl}. This link expires in 15 minutes.`,
+  });
+};
+
 module.exports = {
   verifyEmailConnection,
   sendEmail,
   sendOrderConfirmationEmail,
   sendAdminOrderNotification,
   sendOrderStatusEmail,
+  sendPasswordResetEmail,
 };

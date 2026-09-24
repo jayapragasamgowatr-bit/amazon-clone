@@ -9,6 +9,8 @@ const router = express.Router();
 const {
   registerUser,
   loginUser,
+  forgotPassword,
+  resetPassword,
   getUsers,
   getUserById,
   updateUser,
@@ -38,6 +40,16 @@ router.post(
 router.post(
   "/login",
   loginUser
+);
+
+router.post(
+  "/forgot-password",
+  forgotPassword
+);
+
+router.post(
+  "/reset-password",
+  resetPassword
 );
 
 

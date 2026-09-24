@@ -348,6 +348,39 @@ export const getCurrentUser = async () => {
 };
 
 // ============================================================
+// FORGOT PASSWORD
+// ============================================================
+
+export const forgotPassword = async (email) => {
+  return apiFetch(
+    "/api/auth/forgot-password",
+    {
+      method: "POST",
+      body: {
+        email,
+      },
+    }
+  );
+};
+
+// ============================================================
+// RESET PASSWORD
+// ============================================================
+
+export const resetPassword = async (token, password) => {
+  return apiFetch(
+    "/api/auth/reset-password",
+    {
+      method: "POST",
+      body: {
+        token,
+        password,
+      },
+    }
+  );
+};
+
+// ============================================================
 // PRODUCTS
 // ============================================================
 
