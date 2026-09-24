@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const InventoryTransaction = require("../models/InventoryTransaction");
+
 const {
   sendOrderConfirmationEmail,
   sendAdminOrderNotification,
@@ -380,8 +381,11 @@ const createOrder = async (req, res) => {
         stockMovements.push({
           product: product._id,
           quantityChange: -quantity,
-          previousStock: Number(product.countInStock) + quantity,
-          newStock: Number(product.countInStock),
+          previousStock:
+            Number(product.countInStock) +
+            quantity,
+          newStock:
+            Number(product.countInStock),
         });
       }
 
@@ -452,7 +456,9 @@ const createOrder = async (req, res) => {
             referenceId: createdOrder._id,
             performedBy: userId,
           })),
-          { session }
+          {
+            session,
+          }
         );
       }
     });
@@ -460,49 +466,69 @@ const createOrder = async (req, res) => {
     /*
      * Transaction committed successfully.
      *
-     * Email happens AFTER commit so an email failure
-     * cannot undo a successful order.
+     * IMPORTANT:
+     * Email notifications are started AFTER the transaction
+     * and are NOT awaited.
+     *
+     * This prevents Gmail SMTP problems from blocking checkout.
      */
     await createdOrder.populate(
       "user",
       "name email"
     );
 
-    const emailResults =
-      await Promise.allSettled([
-        sendOrderConfirmationEmail(
-          createdOrder
-        ),
+    /*
+     * Start email processing in the background.
+     *
+     * The customer's order response will NOT wait for Gmail.
+     */
+    Promise.allSettled([
+      sendOrderConfirmationEmail(
+        createdOrder
+      ),
 
-        sendAdminOrderNotification(
-          createdOrder
-        ),
-      ]);
+      sendAdminOrderNotification(
+        createdOrder
+      ),
+    ])
+      .then((emailResults) => {
+        emailResults.forEach(
+          (result, index) => {
+            if (
+              result.status ===
+              "rejected"
+            ) {
+              console.error(
+                index === 0
+                  ? "Customer order email failed:"
+                  : "Admin order email failed:",
+                result.reason?.message ||
+                  result.reason
+              );
+            }
+          }
+        );
+      })
+      .catch((emailError) => {
+        console.error(
+          "Background order email processing failed:",
+          emailError?.message ||
+            emailError
+        );
+      });
 
-    emailResults.forEach(
-      (result, index) => {
-        if (
-          result.status ===
-          "rejected"
-        ) {
-          console.error(
-            index === 0
-              ? "Customer order email failed:"
-              : "Admin order email failed:",
-            result.reason?.message ||
-              result.reason
-          );
-        }
-      }
-    );
-
+    /*
+     * Return the order immediately.
+     *
+     * Gmail SMTP is no longer part of the checkout request.
+     */
     return res.status(201).json({
       success: true,
-      message:
-        "Order created successfully",
+      message: "Order created successfully",
       order: createdOrder,
       _id: createdOrder._id,
     });
+
   } catch (error) {
     console.error(
       "CREATE ORDER ERROR:",
@@ -550,6 +576,7 @@ const createOrder = async (req, res) => {
       message:
         "Failed to create order",
     });
+
   } finally {
     await session.endSession();
   }
@@ -571,12 +598,19 @@ const escapeRegex = (value) =>
  * Admin default: 20
  * Maximum: 100
  */
-const parsePagination = (query, defaultLimit) => {
-  const requestedPage = Number(query?.page || 1);
-  const requestedLimit = Number(query?.limit || defaultLimit);
+const parsePagination = (
+  query,
+  defaultLimit
+) => {
+  const requestedPage =
+    Number(query?.page || 1);
+
+  const requestedLimit =
+    Number(query?.limit || defaultLimit);
 
   const page =
-    Number.isInteger(requestedPage) && requestedPage >= 1
+    Number.isInteger(requestedPage) &&
+    requestedPage >= 1
       ? requestedPage
       : 1;
 
@@ -597,22 +631,38 @@ const parsePagination = (query, defaultLimit) => {
 /*
  * Parse a YYYY-MM-DD date safely.
  */
-const parseDateOnly = (value, endOfDay = false) => {
+const parseDateOnly = (
+  value,
+  endOfDay = false
+) => {
   if (!value) {
     return null;
   }
 
-  const text = String(value).trim();
+  const text =
+    String(value).trim();
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      text
+    )
+  ) {
     return null;
   }
 
   const date = new Date(
-    `${text}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`
+    `${text}T${
+      endOfDay
+        ? "23:59:59.999"
+        : "00:00:00.000"
+    }Z`
   );
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
     return null;
   }
 
@@ -640,21 +690,35 @@ const buildOrderFilters = ({
   }
 
   if (status) {
-    const normalizedStatus = String(status).trim();
+    const normalizedStatus =
+      String(status).trim();
 
-    if (!ALLOWED_STATUSES.includes(normalizedStatus)) {
-      const error = new Error("Invalid order status");
+    if (
+      !ALLOWED_STATUSES.includes(
+        normalizedStatus
+      )
+    ) {
+      const error = new Error(
+        "Invalid order status"
+      );
+
       error.statusCode = 400;
+
       throw error;
     }
 
-    filter.status = normalizedStatus;
+    filter.status =
+      normalizedStatus;
   }
 
-  const searchText = String(search || "").trim().slice(0, 100);
+  const searchText =
+    String(search || "")
+      .trim()
+      .slice(0, 100);
 
   if (searchText) {
-    const escapedSearch = escapeRegex(searchText);
+    const escapedSearch =
+      escapeRegex(searchText);
 
     const searchConditions = [
       {
@@ -663,42 +727,49 @@ const buildOrderFilters = ({
           $options: "i",
         },
       },
+
       {
         "customer.email": {
           $regex: escapedSearch,
           $options: "i",
         },
       },
+
       {
         "customer.phone": {
           $regex: escapedSearch,
           $options: "i",
         },
       },
+
       {
         "shippingAddress.name": {
           $regex: escapedSearch,
           $options: "i",
         },
       },
+
       {
         "shippingAddress.email": {
           $regex: escapedSearch,
           $options: "i",
         },
       },
+
       {
         "shippingAddress.phone": {
           $regex: escapedSearch,
           $options: "i",
         },
       },
+
       {
         "shippingAddress.city": {
           $regex: escapedSearch,
           $options: "i",
         },
       },
+
       {
         "shippingAddress.state": {
           $regex: escapedSearch,
@@ -707,71 +778,108 @@ const buildOrderFilters = ({
       },
     ];
 
-    if (mongoose.Types.ObjectId.isValid(searchText)) {
+    if (
+      mongoose.Types.ObjectId.isValid(
+        searchText
+      )
+    ) {
       searchConditions.push({
         _id: searchText,
       });
     }
 
-    filter.$or = searchConditions;
+    filter.$or =
+      searchConditions;
   }
 
-  const startDate = parseDateOnly(from);
-  const endDate = parseDateOnly(to, true);
+  const startDate =
+    parseDateOnly(from);
+
+  const endDate =
+    parseDateOnly(
+      to,
+      true
+    );
 
   if (from && !startDate) {
-    const error = new Error("Invalid from date");
+    const error = new Error(
+      "Invalid from date"
+    );
+
     error.statusCode = 400;
+
     throw error;
   }
 
   if (to && !endDate) {
-    const error = new Error("Invalid to date");
+    const error = new Error(
+      "Invalid to date"
+    );
+
     error.statusCode = 400;
+
     throw error;
   }
 
-  if (startDate && endDate && startDate > endDate) {
-    const error = new Error("from date cannot be after to date");
+  if (
+    startDate &&
+    endDate &&
+    startDate > endDate
+  ) {
+    const error = new Error(
+      "from date cannot be after to date"
+    );
+
     error.statusCode = 400;
+
     throw error;
   }
 
-  if (startDate || endDate) {
+  if (
+    startDate ||
+    endDate
+  ) {
     filter.createdAt = {};
 
     if (startDate) {
-      filter.createdAt.$gte = startDate;
+      filter.createdAt.$gte =
+        startDate;
     }
 
     if (endDate) {
-      filter.createdAt.$lte = endDate;
+      filter.createdAt.$lte =
+        endDate;
     }
   }
 
   return {
     filter,
     searchText,
-    status: String(status || "").trim(),
-    from: String(from || "").trim(),
-    to: String(to || "").trim(),
+    status: String(
+      status || ""
+    ).trim(),
+    from: String(
+      from || ""
+    ).trim(),
+    to: String(
+      to || ""
+    ).trim(),
   };
 };
 
 /*
  * Get current user's orders.
- *
- * Supports:
- *   ?page=1
- *   ?limit=10
- *   ?search=customer
- *   ?status=Delivered
- *   ?from=2026-09-01
- *   ?to=2026-09-30
  */
-const getMyOrders = async (req, res) => {
+const getMyOrders = async (
+  req,
+  res
+) => {
   try {
-    const { page, limit, skip } = parsePagination(
+    const {
+      page,
+      limit,
+      skip,
+    } = parsePagination(
       req.query || {},
       10
     );
@@ -783,11 +891,16 @@ const getMyOrders = async (req, res) => {
       from,
       to,
     } = buildOrderFilters({
-      query: req.query || {},
-      includeUser: req.user._id,
+      query:
+        req.query || {},
+      includeUser:
+        req.user._id,
     });
 
-    const [orders, totalOrders] = await Promise.all([
+    const [
+      orders,
+      totalOrders,
+    ] = await Promise.all([
       Order.find(filter)
         .populate(
           "items.product",
@@ -799,43 +912,64 @@ const getMyOrders = async (req, res) => {
         .skip(skip)
         .limit(limit),
 
-      Order.countDocuments(filter),
+      Order.countDocuments(
+        filter
+      ),
     ]);
 
-    const totalPages = Math.ceil(totalOrders / limit);
+    const totalPages =
+      Math.ceil(
+        totalOrders / limit
+      );
 
     return res.status(200).json({
       success: true,
       orders,
-      count: orders.length,
+      count:
+        orders.length,
+
       pagination: {
         page,
         limit,
         totalOrders,
         totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
+        hasNextPage:
+          page < totalPages,
+        hasPreviousPage:
+          page > 1,
       },
+
       filters: {
-        search: searchText,
+        search:
+          searchText,
         status,
         from,
         to,
       },
     });
+
   } catch (error) {
-    console.error("GET MY ORDERS ERROR:", error);
+    console.error(
+      "GET MY ORDERS ERROR:",
+      error
+    );
 
     if (error.statusCode) {
-      return res.status(error.statusCode).json({
-        success: false,
-        message: error.message,
-      });
+      return res
+        .status(
+          error.statusCode
+        )
+        .json({
+          success: false,
+          message:
+            error.message,
+        });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Failed to get orders",
+      message:
+        "Failed to get orders",
     });
   }
 };
@@ -843,18 +977,17 @@ const getMyOrders = async (req, res) => {
 /*
  * Get all orders.
  * Admin only through route middleware.
- *
- * Supports:
- *   ?page=1
- *   ?limit=20
- *   ?search=customer
- *   ?status=Pending
- *   ?from=2026-09-01
- *   ?to=2026-09-30
  */
-const getAllOrders = async (req, res) => {
+const getAllOrders = async (
+  req,
+  res
+) => {
   try {
-    const { page, limit, skip } = parsePagination(
+    const {
+      page,
+      limit,
+      skip,
+    } = parsePagination(
       req.query || {},
       20
     );
@@ -866,10 +999,14 @@ const getAllOrders = async (req, res) => {
       from,
       to,
     } = buildOrderFilters({
-      query: req.query || {},
+      query:
+        req.query || {},
     });
 
-    const [orders, totalOrders] = await Promise.all([
+    const [
+      orders,
+      totalOrders,
+    ] = await Promise.all([
       Order.find(filter)
         .populate(
           "user",
@@ -885,43 +1022,64 @@ const getAllOrders = async (req, res) => {
         .skip(skip)
         .limit(limit),
 
-      Order.countDocuments(filter),
+      Order.countDocuments(
+        filter
+      ),
     ]);
 
-    const totalPages = Math.ceil(totalOrders / limit);
+    const totalPages =
+      Math.ceil(
+        totalOrders / limit
+      );
 
     return res.status(200).json({
       success: true,
       orders,
-      count: orders.length,
+      count:
+        orders.length,
+
       pagination: {
         page,
         limit,
         totalOrders,
         totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
+        hasNextPage:
+          page < totalPages,
+        hasPreviousPage:
+          page > 1,
       },
+
       filters: {
-        search: searchText,
+        search:
+          searchText,
         status,
         from,
         to,
       },
     });
+
   } catch (error) {
-    console.error("GET ALL ORDERS ERROR:", error);
+    console.error(
+      "GET ALL ORDERS ERROR:",
+      error
+    );
 
     if (error.statusCode) {
-      return res.status(error.statusCode).json({
-        success: false,
-        message: error.message,
-      });
+      return res
+        .status(
+          error.statusCode
+        )
+        .json({
+          success: false,
+          message:
+            error.message,
+        });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Failed to get all orders",
+      message:
+        "Failed to get all orders",
     });
   }
 };
@@ -981,7 +1139,9 @@ const getOrderById = async (
         order.user?._id ||
           order.user
       ) !==
-        String(req.user._id)
+        String(
+          req.user._id
+        )
     ) {
       return res.status(403).json({
         success: false,
@@ -994,6 +1154,7 @@ const getOrderById = async (
       success: true,
       order,
     });
+
   } catch (error) {
     console.error(
       "GET ORDER ERROR:",
@@ -1012,16 +1173,6 @@ const getOrderById = async (
  * Update Order Status
  *
  * Cancellation is transactional.
- *
- * The important protection here is:
- *
- *   stockReserved: true
- *   stockRestored: false
- *
- * are used as part of the atomic order update.
- *
- * This means two simultaneous cancellation requests
- * cannot both claim the same inventory restoration.
  */
 const updateOrderStatus = async (
   req,
@@ -1067,6 +1218,7 @@ const updateOrderStatus = async (
 
     await session.withTransaction(
       async () => {
+
         /*
          * Read order inside transaction.
          */
@@ -1081,7 +1233,8 @@ const updateOrderStatus = async (
               "Order not found"
             );
 
-          error.statusCode = 404;
+          error.statusCode =
+            404;
 
           throw error;
         }
@@ -1101,7 +1254,8 @@ const updateOrderStatus = async (
               "Order is already in this status"
             );
 
-          error.statusCode = 409;
+          error.statusCode =
+            409;
 
           throw error;
         }
@@ -1120,7 +1274,8 @@ const updateOrderStatus = async (
               "A cancelled order cannot be reopened"
             );
 
-          error.statusCode = 409;
+          error.statusCode =
+            409;
 
           throw error;
         }
@@ -1140,21 +1295,20 @@ const updateOrderStatus = async (
                 "Delivered"
                 ? "A delivered order can only remain Delivered or be Cancelled"
                 : previousStatus ===
-                  "Cancelled"
-                ? "A cancelled order cannot be reopened"
-                : "Order status cannot move backwards"
+                    "Cancelled"
+                  ? "A cancelled order cannot be reopened"
+                  : "Order status cannot move backwards"
             );
 
-          error.statusCode = 409;
+          error.statusCode =
+            409;
 
           throw error;
         }
 
         /*
-         * ----------------------------------------------------
          * CASE 1:
-         * Normal cancellation with stock restoration
-         * ----------------------------------------------------
+         * Normal cancellation with stock restoration.
          */
         if (
           status ===
@@ -1163,12 +1317,6 @@ const updateOrderStatus = async (
             previousStatus
           )
         ) {
-          /*
-           * Atomically claim the stock restoration.
-           *
-           * If another cancellation request has already
-           * changed this order, this condition will fail.
-           */
           const claimedOrder =
             await Order.findOneAndUpdate(
               {
@@ -1177,9 +1325,11 @@ const updateOrderStatus = async (
                 status:
                   previousStatus,
 
-                stockReserved: true,
+                stockReserved:
+                  true,
 
-                stockRestored: false,
+                stockRestored:
+                  false,
               },
               {
                 $set: {
@@ -1209,20 +1359,20 @@ const updateOrderStatus = async (
                 },
               },
               {
-                returnDocument: "after",
+                returnDocument:
+                  "after",
 
                 session,
               }
             );
 
-          /*
-           * Another request won the cancellation race.
-           */
           if (!claimedOrder) {
             const latestOrder =
               await Order.findById(
                 id
-              ).session(session);
+              ).session(
+                session
+              );
 
             if (
               latestOrder?.status ===
@@ -1251,28 +1401,77 @@ const updateOrderStatus = async (
           }
 
           /*
-           * Restore each reserved product inside the
-           * SAME transaction.
+           * Restore each reserved product inside
+           * the SAME transaction.
            */
           for (const item of order.items) {
-            const restoredProduct = await Product.findOneAndUpdate(
-              { _id: item.product },
-              { $inc: { countInStock: item.quantity } },
-              { returnDocument: "after", session }
-            );
+            const restoredProduct =
+              await Product.findOneAndUpdate(
+                {
+                  _id:
+                    item.product,
+                },
+                {
+                  $inc: {
+                    countInStock:
+                      item.quantity,
+                  },
+                },
+                {
+                  returnDocument:
+                    "after",
+                  session,
+                }
+              );
 
             if (restoredProduct) {
-              await InventoryTransaction.create([{
-                product: item.product,
-                type: "IN",
-                quantityChange: Number(item.quantity),
-                previousStock: Math.max(0, Number(restoredProduct.countInStock) - Number(item.quantity)),
-                newStock: Number(restoredProduct.countInStock),
-                reason: "Order cancelled",
-                referenceType: "Order",
-                referenceId: order._id,
-                performedBy: getUserId(req) || null,
-              }], { session });
+              await InventoryTransaction.create(
+                [
+                  {
+                    product:
+                      item.product,
+
+                    type: "IN",
+
+                    quantityChange:
+                      Number(
+                        item.quantity
+                      ),
+
+                    previousStock:
+                      Math.max(
+                        0,
+                        Number(
+                          restoredProduct.countInStock
+                        ) -
+                          Number(
+                            item.quantity
+                          )
+                      ),
+
+                    newStock:
+                      Number(
+                        restoredProduct.countInStock
+                      ),
+
+                    reason:
+                      "Order cancelled",
+
+                    referenceType:
+                      "Order",
+
+                    referenceId:
+                      order._id,
+
+                    performedBy:
+                      getUserId(req) ||
+                      null,
+                  },
+                ],
+                {
+                  session,
+                }
+              );
             }
           }
 
@@ -1283,12 +1482,10 @@ const updateOrderStatus = async (
         }
 
         /*
-         * ----------------------------------------------------
          * CASE 2:
          * Delivered -> Cancelled
          *
          * No automatic stock restoration.
-         * ----------------------------------------------------
          */
         if (
           previousStatus ===
@@ -1332,7 +1529,8 @@ const updateOrderStatus = async (
                 },
               },
               {
-                returnDocument: "after",
+                returnDocument:
+                  "after",
 
                 session,
               }
@@ -1357,10 +1555,8 @@ const updateOrderStatus = async (
         }
 
         /*
-         * ----------------------------------------------------
          * CASE 3:
          * Delivered status
-         * ----------------------------------------------------
          */
         if (
           status ===
@@ -1388,7 +1584,8 @@ const updateOrderStatus = async (
                 },
               },
               {
-                returnDocument: "after",
+                returnDocument:
+                  "after",
 
                 session,
               }
@@ -1413,10 +1610,8 @@ const updateOrderStatus = async (
         }
 
         /*
-         * ----------------------------------------------------
          * CASE 4:
          * Normal forward status transition.
-         * ----------------------------------------------------
          */
         const claimedOrder =
           await Order.findOneAndUpdate(
@@ -1432,7 +1627,8 @@ const updateOrderStatus = async (
               },
             },
             {
-              returnDocument: "after",
+              returnDocument:
+                "after",
 
               session,
             }
@@ -1467,16 +1663,19 @@ const updateOrderStatus = async (
      * Email failure must never roll back
      * the already committed status update.
      */
-    try {
-      await sendOrderStatusEmail(
-        updatedOrder
-      );
-    } catch (emailError) {
-      console.error(
-        "ORDER STATUS EMAIL FAILED:",
-        emailError.message
-      );
-    }
+    Promise.resolve()
+      .then(() =>
+        sendOrderStatusEmail(
+          updatedOrder
+        )
+      )
+      .catch((emailError) => {
+        console.error(
+          "ORDER STATUS EMAIL FAILED:",
+          emailError?.message ||
+            emailError
+        );
+      });
 
     return res.status(200).json({
       success: true,
@@ -1484,6 +1683,7 @@ const updateOrderStatus = async (
         "Order status updated",
       order: updatedOrder,
     });
+
   } catch (error) {
     console.error(
       "UPDATE ORDER STATUS ERROR:",
@@ -1502,13 +1702,15 @@ const updateOrderStatus = async (
     }
 
     if (error.statusCode) {
-      return res.status(
-        error.statusCode
-      ).json({
-        success: false,
-        message:
-          error.message,
-      });
+      return res
+        .status(
+          error.statusCode
+        )
+        .json({
+          success: false,
+          message:
+            error.message,
+        });
     }
 
     return res.status(500).json({
@@ -1516,6 +1718,7 @@ const updateOrderStatus = async (
       message:
         "Failed to update order status",
     });
+
   } finally {
     await session.endSession();
   }
@@ -1604,8 +1807,9 @@ const getAdminAnalytics = async (
     }
 
     const orderMatch =
-      Object.keys(dateMatch)
-        .length
+      Object.keys(
+        dateMatch
+      ).length
         ? {
             createdAt:
               dateMatch,
@@ -1721,6 +1925,7 @@ const getAdminAnalytics = async (
         {
           $group: {
             _id: "$status",
+
             count: {
               $sum: 1,
             },
@@ -1745,7 +1950,8 @@ const getAdminAnalytics = async (
         },
 
         {
-          $unwind: "$items",
+          $unwind:
+            "$items",
         },
 
         {
@@ -1856,8 +2062,7 @@ const getAdminAnalytics = async (
           countInStock: 1,
           name: 1,
         })
-        .limit(20)
-        .lean(),
+        .limit(20),
 
       require("../models/User")
         .countDocuments(),
@@ -1985,6 +2190,7 @@ const getAdminAnalytics = async (
 
       lowStockProducts,
     });
+
   } catch (error) {
     console.error(
       "GET ADMIN ANALYTICS ERROR:",
@@ -1995,6 +2201,827 @@ const getAdminAnalytics = async (
       success: false,
       message:
         "Failed to load admin analytics",
+    });
+  }
+};
+
+/*
+ * Advanced business analytics.
+ *
+ * GET /api/orders/admin/advanced-analytics
+ *
+ * Admin only.
+ */
+const getAdvancedAnalytics = async (
+  req,
+  res
+) => {
+  try {
+    const {
+      from,
+      to,
+    } = req.query || {};
+
+    const dateMatch = {};
+
+    const parseDate = (
+      value,
+      endOfDay = false
+    ) => {
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          String(value || "")
+        )
+      ) {
+        return null;
+      }
+
+      const date = new Date(
+        `${value}T${
+          endOfDay
+            ? "23:59:59.999"
+            : "00:00:00.000"
+        }Z`
+      );
+
+      return Number.isNaN(
+        date.getTime()
+      )
+        ? null
+        : date;
+    };
+
+    if (from) {
+      const start =
+        parseDate(from);
+
+      if (!start) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid from date",
+        });
+      }
+
+      dateMatch.$gte =
+        start;
+    }
+
+    if (to) {
+      const end =
+        parseDate(
+          to,
+          true
+        );
+
+      if (!end) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid to date",
+        });
+      }
+
+      dateMatch.$lte =
+        end;
+    }
+
+    if (
+      dateMatch.$gte &&
+      dateMatch.$lte &&
+      dateMatch.$gte >
+        dateMatch.$lte
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "from date cannot be after to date",
+      });
+    }
+
+    const orderMatch =
+      Object.keys(
+        dateMatch
+      ).length
+        ? {
+            createdAt:
+              dateMatch,
+          }
+        : {};
+
+    const activeProductMatch = {
+      $or: [
+        {
+          isActive: true,
+        },
+        {
+          isActive: {
+            $exists: false,
+          },
+        },
+      ],
+    };
+
+    const [
+      summaryAgg,
+      customerAgg,
+      categoryAgg,
+      fulfillmentAgg,
+      paymentAgg,
+      topCustomers,
+      inventoryAgg,
+      reviewAgg,
+    ] = await Promise.all([
+      Order.aggregate([
+        {
+          $match:
+            orderMatch,
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            orders: {
+              $sum: 1,
+            },
+
+            cancelled: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      "$status",
+                      "Cancelled",
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            delivered: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      "$status",
+                      "Delivered",
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            revenue: {
+              $sum: {
+                $cond: [
+                  {
+                    $ne: [
+                      "$status",
+                      "Cancelled",
+                    ],
+                  },
+                  "$totalPrice",
+                  0,
+                ],
+              },
+            },
+
+            units: {
+              $sum: {
+                $cond: [
+                  {
+                    $ne: [
+                      "$status",
+                      "Cancelled",
+                    ],
+                  },
+                  {
+                    $sum:
+                      "$items.quantity",
+                  },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+
+      Order.aggregate([
+        {
+          $match: {
+            ...orderMatch,
+
+            status: {
+              $ne: "Cancelled",
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: "$user",
+
+            orders: {
+              $sum: 1,
+            },
+
+            revenue: {
+              $sum:
+                "$totalPrice",
+            },
+
+            lastOrder: {
+              $max:
+                "$createdAt",
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            uniqueCustomers: {
+              $sum: 1,
+            },
+
+            repeatCustomers: {
+              $sum: {
+                $cond: [
+                  {
+                    $gt: [
+                      "$orders",
+                      1,
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            averageCustomerRevenue: {
+              $avg: "$revenue",
+            },
+          },
+        },
+      ]),
+
+      Order.aggregate([
+        {
+          $match: {
+            ...orderMatch,
+
+            status: {
+              $ne: "Cancelled",
+            },
+          },
+        },
+
+        {
+          $unwind:
+            "$items",
+        },
+
+        {
+          $lookup: {
+            from: "products",
+            localField:
+              "items.product",
+            foreignField:
+              "_id",
+            as: "product",
+          },
+        },
+
+        {
+          $unwind: {
+            path:
+              "$product",
+            preserveNullAndEmptyArrays:
+              true,
+          },
+        },
+
+        {
+          $group: {
+            _id: {
+              $ifNull: [
+                "$product.category",
+                "Uncategorized",
+              ],
+            },
+
+            units: {
+              $sum:
+                "$items.quantity",
+            },
+
+            revenue: {
+              $sum: {
+                $multiply: [
+                  "$items.price",
+                  "$items.quantity",
+                ],
+              },
+            },
+          },
+        },
+
+        {
+          $sort: {
+            revenue: -1,
+          },
+        },
+
+        {
+          $limit: 12,
+        },
+      ]),
+
+      Order.aggregate([
+        {
+          $match: {
+            ...orderMatch,
+
+            status:
+              "Delivered",
+
+            deliveredAt: {
+              $ne: null,
+            },
+          },
+        },
+
+        {
+          $project: {
+            hours: {
+              $divide: [
+                {
+                  $subtract: [
+                    "$deliveredAt",
+                    "$createdAt",
+                  ],
+                },
+                3600000,
+              ],
+            },
+          },
+        },
+
+        {
+          $match: {
+            hours: {
+              $gte: 0,
+              $lte: 8760,
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            averageHours: {
+              $avg: "$hours",
+            },
+
+            fastestHours: {
+              $min: "$hours",
+            },
+
+            slowestHours: {
+              $max: "$hours",
+            },
+          },
+        },
+      ]),
+
+      Order.aggregate([
+        {
+          $match:
+            orderMatch,
+        },
+
+        {
+          $group: {
+            _id:
+              "$paymentMethod",
+
+            orders: {
+              $sum: 1,
+            },
+
+            revenue: {
+              $sum: {
+                $cond: [
+                  {
+                    $ne: [
+                      "$status",
+                      "Cancelled",
+                    ],
+                  },
+                  "$totalPrice",
+                  0,
+                ],
+              },
+            },
+          },
+        },
+
+        {
+          $sort: {
+            revenue: -1,
+          },
+        },
+      ]),
+
+      Order.aggregate([
+        {
+          $match: {
+            ...orderMatch,
+
+            status: {
+              $ne: "Cancelled",
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: "$user",
+
+            name: {
+              $first:
+                "$customer.name",
+            },
+
+            email: {
+              $first:
+                "$customer.email",
+            },
+
+            orders: {
+              $sum: 1,
+            },
+
+            revenue: {
+              $sum:
+                "$totalPrice",
+            },
+          },
+        },
+
+        {
+          $sort: {
+            revenue: -1,
+          },
+        },
+
+        {
+          $limit: 10,
+        },
+      ]),
+
+      Product.aggregate([
+        {
+          $match:
+            activeProductMatch,
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            products: {
+              $sum: 1,
+            },
+
+            stockUnits: {
+              $sum:
+                "$countInStock",
+            },
+
+            inventoryValue: {
+              $sum: {
+                $multiply: [
+                  "$countInStock",
+                  "$price",
+                ],
+              },
+            },
+
+            lowStock: {
+              $sum: {
+                $cond: [
+                  {
+                    $lte: [
+                      "$countInStock",
+                      5,
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            outOfStock: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      "$countInStock",
+                      0,
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+
+      Product.aggregate([
+        {
+          $match:
+            activeProductMatch,
+        },
+
+        {
+          $project: {
+            reviews: 1,
+            numReviews: 1,
+            rating: 1,
+          },
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            totalReviews: {
+              $sum:
+                "$numReviews",
+            },
+
+            averageRating: {
+              $avg:
+                "$rating",
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const summary =
+      summaryAgg[0] || {};
+
+    const customers =
+      customerAgg[0] || {};
+
+    const fulfillment =
+      fulfillmentAgg[0] || {};
+
+    const inventory =
+      inventoryAgg[0] || {};
+
+    const reviews =
+      reviewAgg[0] || {};
+
+    const orders =
+      Number(
+        summary.orders || 0
+      );
+
+    const cancelled =
+      Number(
+        summary.cancelled || 0
+      );
+
+    const revenue =
+      Number(
+        summary.revenue || 0
+      );
+
+    return res.status(200).json({
+      success: true,
+
+      range: {
+        from:
+          from || null,
+        to:
+          to || null,
+      },
+
+      summary: {
+        orders,
+
+        cancelledOrders:
+          cancelled,
+
+        deliveredOrders:
+          Number(
+            summary.delivered ||
+              0
+          ),
+
+        revenue,
+
+        unitsSold:
+          Number(
+            summary.units ||
+              0
+          ),
+
+        averageOrderValue:
+          orders - cancelled >
+          0
+            ? Number(
+                (
+                  revenue /
+                  (orders -
+                    cancelled)
+                ).toFixed(2)
+              )
+            : 0,
+
+        cancellationRate:
+          orders > 0
+            ? Number(
+                (
+                  (cancelled /
+                    orders) *
+                  100
+                ).toFixed(2)
+              )
+            : 0,
+      },
+
+      customers: {
+        uniqueCustomers:
+          Number(
+            customers.uniqueCustomers ||
+              0
+          ),
+
+        repeatCustomers:
+          Number(
+            customers.repeatCustomers ||
+              0
+          ),
+
+        repeatRate:
+          customers.uniqueCustomers
+            ? Number(
+                (
+                  (customers.repeatCustomers /
+                    customers.uniqueCustomers) *
+                  100
+                ).toFixed(2)
+              )
+            : 0,
+
+        averageCustomerRevenue:
+          Number(
+            customers.averageCustomerRevenue ||
+              0
+          ),
+      },
+
+      categories:
+        categoryAgg.map(
+          (item) => ({
+            category:
+              item._id,
+
+            units:
+              item.units,
+
+            revenue:
+              item.revenue,
+          })
+        ),
+
+      fulfillment: {
+        averageHours:
+          Number(
+            fulfillment.averageHours ||
+              0
+          ),
+
+        fastestHours:
+          Number(
+            fulfillment.fastestHours ||
+              0
+          ),
+
+        slowestHours:
+          Number(
+            fulfillment.slowestHours ||
+              0
+          ),
+      },
+
+      paymentMethods:
+        paymentAgg.map(
+          (item) => ({
+            method:
+              item._id ||
+              "Unknown",
+
+            orders:
+              item.orders,
+
+            revenue:
+              item.revenue,
+          })
+        ),
+
+      topCustomers:
+        topCustomers.map(
+          (item) => ({
+            id: item._id,
+
+            name:
+              item.name,
+
+            email:
+              item.email,
+
+            orders:
+              item.orders,
+
+            revenue:
+              item.revenue,
+          })
+        ),
+
+      inventory: {
+        activeProducts:
+          Number(
+            inventory.products ||
+              0
+          ),
+
+        stockUnits:
+          Number(
+            inventory.stockUnits ||
+              0
+          ),
+
+        inventoryValue:
+          Number(
+            inventory.inventoryValue ||
+              0
+          ),
+
+        lowStock:
+          Number(
+            inventory.lowStock ||
+              0
+          ),
+
+        outOfStock:
+          Number(
+            inventory.outOfStock ||
+              0
+          ),
+      },
+
+      reviews: {
+        totalReviews:
+          Number(
+            reviews.totalReviews ||
+              0
+          ),
+
+        averageRating:
+          Number(
+            reviews.averageRating ||
+              0
+          ),
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      "GET ADVANCED ANALYTICS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to load advanced analytics",
     });
   }
 };
@@ -2017,178 +3044,7 @@ const getAdminAnalytics = async (
  *
  * Cancelled
  *     -> NO stock restoration
- *
- * The stock restoration and order deletion happen
- * inside ONE MongoDB transaction.
  */
-
-
-/*
- * Advanced business analytics.
- * GET /api/orders/admin/advanced-analytics
- * Admin only. Builds decision-ready metrics from existing orders,
- * customers and product/inventory data without introducing a new DB.
- */
-const getAdvancedAnalytics = async (req, res) => {
-  try {
-    const { from, to } = req.query || {};
-    const dateMatch = {};
-
-    const parseDate = (value, endOfDay = false) => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return null;
-      const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
-      return Number.isNaN(date.getTime()) ? null : date;
-    };
-
-    if (from) {
-      const start = parseDate(from);
-      if (!start) return res.status(400).json({ success: false, message: "Invalid from date" });
-      dateMatch.$gte = start;
-    }
-    if (to) {
-      const end = parseDate(to, true);
-      if (!end) return res.status(400).json({ success: false, message: "Invalid to date" });
-      dateMatch.$lte = end;
-    }
-    if (dateMatch.$gte && dateMatch.$lte && dateMatch.$gte > dateMatch.$lte) {
-      return res.status(400).json({ success: false, message: "from date cannot be after to date" });
-    }
-
-    const orderMatch = Object.keys(dateMatch).length ? { createdAt: dateMatch } : {};
-    const activeProductMatch = { $or: [{ isActive: true }, { isActive: { $exists: false } }] };
-
-    const [
-      summaryAgg,
-      customerAgg,
-      categoryAgg,
-      fulfillmentAgg,
-      paymentAgg,
-      topCustomers,
-      inventoryAgg,
-      reviewAgg,
-    ] = await Promise.all([
-      Order.aggregate([
-        { $match: orderMatch },
-        { $group: {
-          _id: null,
-          orders: { $sum: 1 },
-          cancelled: { $sum: { $cond: [{ $eq: ["$status", "Cancelled"] }, 1, 0] } },
-          delivered: { $sum: { $cond: [{ $eq: ["$status", "Delivered"] }, 1, 0] } },
-          revenue: { $sum: { $cond: [{ $ne: ["$status", "Cancelled"] }, "$totalPrice", 0] } },
-          units: { $sum: { $cond: [{ $ne: ["$status", "Cancelled"] }, { $sum: "$items.quantity" }, 0] } },
-        } },
-      ]),
-      Order.aggregate([
-        { $match: { ...orderMatch, status: { $ne: "Cancelled" } } },
-        { $group: { _id: "$user", orders: { $sum: 1 }, revenue: { $sum: "$totalPrice" }, lastOrder: { $max: "$createdAt" } } },
-        { $group: {
-          _id: null,
-          uniqueCustomers: { $sum: 1 },
-          repeatCustomers: { $sum: { $cond: [{ $gt: ["$orders", 1] }, 1, 0] } },
-          averageCustomerRevenue: { $avg: "$revenue" },
-        } },
-      ]),
-      Order.aggregate([
-        { $match: { ...orderMatch, status: { $ne: "Cancelled" } } },
-        { $unwind: "$items" },
-        { $lookup: { from: "products", localField: "items.product", foreignField: "_id", as: "product" } },
-        { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-        { $group: {
-          _id: { $ifNull: ["$product.category", "Uncategorized"] },
-          units: { $sum: "$items.quantity" },
-          revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
-        } },
-        { $sort: { revenue: -1 } },
-        { $limit: 12 },
-      ]),
-      Order.aggregate([
-        { $match: { ...orderMatch, status: "Delivered", deliveredAt: { $ne: null } } },
-        { $project: { hours: { $divide: [{ $subtract: ["$deliveredAt", "$createdAt"] }, 3600000] } } },
-        { $match: { hours: { $gte: 0, $lte: 8760 } } },
-        { $group: { _id: null, averageHours: { $avg: "$hours" }, fastestHours: { $min: "$hours" }, slowestHours: { $max: "$hours" } } },
-      ]),
-      Order.aggregate([
-        { $match: orderMatch },
-        { $group: { _id: "$paymentMethod", orders: { $sum: 1 }, revenue: { $sum: { $cond: [{ $ne: ["$status", "Cancelled"] }, "$totalPrice", 0] } } } },
-        { $sort: { revenue: -1 } },
-      ]),
-      Order.aggregate([
-        { $match: { ...orderMatch, status: { $ne: "Cancelled" } } },
-        { $group: { _id: "$user", name: { $first: "$customer.name" }, email: { $first: "$customer.email" }, orders: { $sum: 1 }, revenue: { $sum: "$totalPrice" } } },
-        { $sort: { revenue: -1 } },
-        { $limit: 10 },
-      ]),
-      Product.aggregate([
-        { $match: activeProductMatch },
-        { $group: {
-          _id: null,
-          products: { $sum: 1 },
-          stockUnits: { $sum: "$countInStock" },
-          inventoryValue: { $sum: { $multiply: ["$countInStock", "$price"] } },
-          lowStock: { $sum: { $cond: [{ $lte: ["$countInStock", 5] }, 1, 0] } },
-          outOfStock: { $sum: { $cond: [{ $eq: ["$countInStock", 0] }, 1, 0] } },
-        } },
-      ]),
-      Product.aggregate([
-        { $match: activeProductMatch },
-        { $project: { reviews: 1, numReviews: 1, rating: 1 } },
-        { $group: { _id: null, totalReviews: { $sum: "$numReviews" }, averageRating: { $avg: "$rating" } } },
-      ]),
-    ]);
-
-    const summary = summaryAgg[0] || {};
-    const customers = customerAgg[0] || {};
-    const fulfillment = fulfillmentAgg[0] || {};
-    const inventory = inventoryAgg[0] || {};
-    const reviews = reviewAgg[0] || {};
-    const orders = Number(summary.orders || 0);
-    const cancelled = Number(summary.cancelled || 0);
-    const revenue = Number(summary.revenue || 0);
-
-    return res.status(200).json({
-      success: true,
-      range: { from: from || null, to: to || null },
-      summary: {
-        orders,
-        cancelledOrders: cancelled,
-        deliveredOrders: Number(summary.delivered || 0),
-        revenue,
-        unitsSold: Number(summary.units || 0),
-        averageOrderValue: orders - cancelled > 0 ? Number((revenue / (orders - cancelled)).toFixed(2)) : 0,
-        cancellationRate: orders > 0 ? Number(((cancelled / orders) * 100).toFixed(2)) : 0,
-      },
-      customers: {
-        uniqueCustomers: Number(customers.uniqueCustomers || 0),
-        repeatCustomers: Number(customers.repeatCustomers || 0),
-        repeatRate: customers.uniqueCustomers ? Number(((customers.repeatCustomers / customers.uniqueCustomers) * 100).toFixed(2)) : 0,
-        averageCustomerRevenue: Number(customers.averageCustomerRevenue || 0),
-      },
-      categories: categoryAgg.map((item) => ({ category: item._id, units: item.units, revenue: item.revenue })),
-      fulfillment: {
-        averageHours: Number(fulfillment.averageHours || 0),
-        fastestHours: Number(fulfillment.fastestHours || 0),
-        slowestHours: Number(fulfillment.slowestHours || 0),
-      },
-      paymentMethods: paymentAgg.map((item) => ({ method: item._id || "Unknown", orders: item.orders, revenue: item.revenue })),
-      topCustomers: topCustomers.map((item) => ({ id: item._id, name: item.name, email: item.email, orders: item.orders, revenue: item.revenue })),
-      inventory: {
-        activeProducts: Number(inventory.products || 0),
-        stockUnits: Number(inventory.stockUnits || 0),
-        inventoryValue: Number(inventory.inventoryValue || 0),
-        lowStock: Number(inventory.lowStock || 0),
-        outOfStock: Number(inventory.outOfStock || 0),
-      },
-      reviews: {
-        totalReviews: Number(reviews.totalReviews || 0),
-        averageRating: Number(reviews.averageRating || 0),
-      },
-    });
-  } catch (error) {
-    console.error("GET ADVANCED ANALYTICS ERROR:", error);
-    return res.status(500).json({ success: false, message: "Failed to load advanced analytics" });
-  }
-};
-
 const deleteOrder = async (
   req,
   res
@@ -2213,6 +3069,7 @@ const deleteOrder = async (
     }
 
     let deletedOrder = null;
+
     let stockWasRestored =
       false;
 
@@ -2229,7 +3086,8 @@ const deleteOrder = async (
               "Order not found"
             );
 
-          error.statusCode = 404;
+          error.statusCode =
+            404;
 
           throw error;
         }
@@ -2277,9 +3135,6 @@ const deleteOrder = async (
 
         /*
          * Delete the order inside the SAME transaction.
-         *
-         * If stock restoration fails, the delete is
-         * also rolled back.
          */
         await Order.deleteOne(
           {
@@ -2309,6 +3164,7 @@ const deleteOrder = async (
       stockRestored:
         stockWasRestored,
     });
+
   } catch (error) {
     console.error(
       "DELETE ORDER ERROR:",
@@ -2316,13 +3172,15 @@ const deleteOrder = async (
     );
 
     if (error.statusCode) {
-      return res.status(
-        error.statusCode
-      ).json({
-        success: false,
-        message:
-          error.message,
-      });
+      return res
+        .status(
+          error.statusCode
+        )
+        .json({
+          success: false,
+          message:
+            error.message,
+        });
     }
 
     return res.status(500).json({
@@ -2330,6 +3188,7 @@ const deleteOrder = async (
       message:
         "Failed to delete order",
     });
+
   } finally {
     await session.endSession();
   }

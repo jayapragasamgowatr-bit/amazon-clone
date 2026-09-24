@@ -1,109 +1,68 @@
-const nodemailer = require("nodemailer");
-
 /*
 |--------------------------------------------------------------------------
-| Gmail Configuration
+| Waventra Vetric - Brevo Transactional Email Service
 |--------------------------------------------------------------------------
+|
+| Brevo API is used instead of Gmail SMTP.
 |
 | Required environment variables:
 |
-| EMAIL_USER=your-gmail@gmail.com
-| EMAIL_APP_PASSWORD=your-google-app-password
-|
-| IMPORTANT:
-| EMAIL_APP_PASSWORD must be your Gmail App Password,
-| NOT your normal Gmail password.
+| BREVO_API_KEY=your_brevo_api_key
+| BREVO_SENDER_EMAIL=your_verified_sender_email
+| BREVO_SENDER_NAME=Waventra Vetric
+| ORDER_NOTIFICATION_EMAIL=your_admin_notification_email
 |
 |--------------------------------------------------------------------------
 */
 
-const EMAIL_USER = String(
-  process.env.EMAIL_USER || ""
+const BREVO_API_URL =
+  "https://api.brevo.com/v3/smtp/email";
+
+const BREVO_ACCOUNT_URL =
+  "https://api.brevo.com/v3/account";
+
+const BREVO_API_KEY = String(
+  process.env.BREVO_API_KEY || ""
 ).trim();
 
-const EMAIL_APP_PASSWORD = String(
-  process.env.EMAIL_APP_PASSWORD || ""
+const BREVO_SENDER_EMAIL = String(
+  process.env.BREVO_SENDER_EMAIL || ""
+)
+  .trim()
+  .toLowerCase();
+
+const BREVO_SENDER_NAME = String(
+  process.env.BREVO_SENDER_NAME ||
+    "Waventra Vetric"
 ).trim();
 
-let transporter = null;
+const ORDER_NOTIFICATION_EMAIL = String(
+  process.env.ORDER_NOTIFICATION_EMAIL || ""
+)
+  .trim()
+  .toLowerCase();
+
 
 /*
 |--------------------------------------------------------------------------
-| Create Gmail Transporter
+| Configuration Check
 |--------------------------------------------------------------------------
 */
 
-if (EMAIL_USER && EMAIL_APP_PASSWORD) {
-  transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-
-    // Force IPv4.
-    // Render was resolving smtp.gmail.com to IPv6 and
-    // returning ENETUNREACH / Connection timeout.
-    family: 4,
-
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_APP_PASSWORD,
-    },
-
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-  });
-
+if (
+  BREVO_API_KEY &&
+  BREVO_SENDER_EMAIL
+) {
   console.log(
-    "Gmail SMTP email service configured successfully"
+    "Brevo transactional email service configured successfully"
   );
 } else {
   console.warn(
-    "Gmail email service is not configured. " +
-      "Missing EMAIL_USER or EMAIL_APP_PASSWORD."
+    "Brevo email service is not fully configured. " +
+      "Missing BREVO_API_KEY or BREVO_SENDER_EMAIL."
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| Verify Gmail SMTP Connection
-|--------------------------------------------------------------------------
-*/
-
-const verifyEmailConnection = async () => {
-  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
-    console.error(
-      "Gmail email service is not configured."
-    );
-
-    return false;
-  }
-
-  if (!transporter) {
-    console.error(
-      "Gmail transporter is not available."
-    );
-
-    return false;
-  }
-
-  try {
-    await transporter.verify();
-
-    console.log(
-      "Gmail SMTP connection verified successfully"
-    );
-
-    return true;
-  } catch (error) {
-    console.error(
-      "Gmail SMTP verification failed:",
-      error.message
-    );
-
-    return false;
-  }
-};
 
 /*
 |--------------------------------------------------------------------------
@@ -124,6 +83,7 @@ const escapeHtml = (value = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+
 /*
 |--------------------------------------------------------------------------
 | Format Indian Rupees
@@ -131,61 +91,224 @@ const escapeHtml = (value = "") =>
 */
 
 const formatINR = (value) =>
-  `₹${Number(value || 0).toLocaleString("en-IN")}`;
+  `₹${Number(value || 0).toLocaleString(
+    "en-IN"
+  )}`;
+
 
 /*
 |--------------------------------------------------------------------------
-| Generic Email Sender
+| Verify Brevo API Connection
+|--------------------------------------------------------------------------
+|
+| This does NOT send an email.
+|
+|--------------------------------------------------------------------------
+*/
+
+const verifyEmailConnection = async () => {
+  if (!BREVO_API_KEY) {
+    console.error(
+      "Brevo email service is not configured: BREVO_API_KEY is missing."
+    );
+
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      BREVO_ACCOUNT_URL,
+      {
+        method: "GET",
+
+        headers: {
+          accept: "application/json",
+          "api-key": BREVO_API_KEY,
+        },
+
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    let data = null;
+
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      console.error(
+        "Brevo API verification failed:",
+        response.status,
+        data?.message || data
+      );
+
+      return false;
+    }
+
+    console.log(
+      "Brevo API connection verified successfully"
+    );
+
+    if (data?.email) {
+      console.log(
+        `Brevo account: ${data.email}`
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.error(
+      "Brevo API verification failed:",
+      error?.message || error
+    );
+
+    return false;
+  }
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| Generic Brevo Email Sender
 |--------------------------------------------------------------------------
 */
 
 const sendEmail = async ({
   to,
+  toName = "",
   subject,
   html,
+  text = "",
 }) => {
-  if (!to) {
+  const recipientEmail = String(
+    to || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!recipientEmail) {
     throw new Error(
       "Recipient email is required"
     );
   }
 
-  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+  if (!BREVO_API_KEY) {
     throw new Error(
-      "Gmail email service is not configured"
+      "Brevo email service is not configured: BREVO_API_KEY is missing"
     );
   }
 
-  if (!transporter) {
+  if (!BREVO_SENDER_EMAIL) {
     throw new Error(
-      "Gmail transporter is not available"
+      "Brevo email service is not configured: BREVO_SENDER_EMAIL is missing"
     );
   }
+
+  if (!subject) {
+    throw new Error(
+      "Email subject is required"
+    );
+  }
+
+  if (!html) {
+    throw new Error(
+      "Email HTML content is required"
+    );
+  }
+
+  const recipient = {
+    email: recipientEmail,
+  };
+
+  if (toName) {
+    recipient.name = String(toName);
+  }
+
+  const payload = {
+    sender: {
+      name: BREVO_SENDER_NAME,
+      email: BREVO_SENDER_EMAIL,
+    },
+
+    to: [
+      recipient,
+    ],
+
+    subject: String(subject),
+
+    htmlContent: String(html),
+
+    ...(text
+      ? {
+          textContent: String(text),
+        }
+      : {}),
+  };
 
   try {
-    const result = await transporter.sendMail({
-      from: `"Waventra Vetric" <${EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-    });
+    const response = await fetch(
+      BREVO_API_URL,
+      {
+        method: "POST",
+
+        headers: {
+          accept: "application/json",
+          "api-key": BREVO_API_KEY,
+          "content-type":
+            "application/json",
+        },
+
+        body: JSON.stringify(
+          payload
+        ),
+
+        signal: AbortSignal.timeout(
+          15000
+        ),
+      }
+    );
+
+    let responseData = null;
+
+    try {
+      responseData =
+        await response.json();
+    } catch {
+      responseData = null;
+    }
+
+    if (!response.ok) {
+      const message =
+        responseData?.message ||
+        responseData?.code ||
+        "Unknown Brevo API error";
+
+      throw new Error(
+        `Brevo email failed (${response.status}): ${message}`
+      );
+    }
 
     console.log(
-      `Email sent successfully: ${
-        result.messageId || "unknown"
+      `Email sent successfully through Brevo: ${
+        responseData?.messageId ||
+        "message accepted"
       }`
     );
 
-    return result;
+    return responseData;
   } catch (error) {
     console.error(
-      "Email sending error:",
-      error.message
+      "Brevo email sending error:",
+      error?.message || error
     );
 
     throw error;
   }
 };
+
 
 /*
 |--------------------------------------------------------------------------
@@ -194,14 +317,17 @@ const sendEmail = async ({
 */
 
 const renderItems = (items) =>
-  (Array.isArray(items) ? items : [])
+  (Array.isArray(items)
+    ? items
+    : []
+  )
     .map((item) => {
       const quantity = Number(
-        item.quantity || 1
+        item?.quantity || 1
       );
 
       const price = Number(
-        item.price || 0
+        item?.price || 0
       );
 
       return `
@@ -212,7 +338,8 @@ const renderItems = (items) =>
             border-bottom:1px solid #ddd;
           ">
             ${escapeHtml(
-              item.name || "Product"
+              item?.name ||
+                "Product"
             )}
           </td>
 
@@ -239,6 +366,8 @@ const renderItems = (items) =>
     })
     .join("");
 
+
+
 /*
 |--------------------------------------------------------------------------
 | Render Shipping Address
@@ -251,25 +380,26 @@ const addressHtml = (order) => {
 
   return `
     ${escapeHtml(
-      address.address || ""
+      address?.address || ""
     )}<br/>
 
     ${escapeHtml(
-      address.city || ""
+      address?.city || ""
     )}<br/>
 
     ${escapeHtml(
-      address.state || ""
+      address?.state || ""
     )}<br/>
 
     Pincode:
     ${escapeHtml(
-      address.postalCode ||
-        address.pincode ||
+      address?.postalCode ||
+        address?.pincode ||
         ""
     )}
   `;
 };
+
 
 /*
 |--------------------------------------------------------------------------
@@ -277,39 +407,44 @@ const addressHtml = (order) => {
 |--------------------------------------------------------------------------
 */
 
-const sendOrderConfirmationEmail = async (
-  order
-) => {
-  const customerEmail = String(
-    order?.customer?.email || ""
-  )
-    .trim()
-    .toLowerCase();
+const sendOrderConfirmationEmail =
+  async (order) => {
+    const customerEmail =
+      String(
+        order?.customer?.email ||
+          ""
+      )
+        .trim()
+        .toLowerCase();
 
-  if (!customerEmail) {
-    throw new Error(
-      "Customer email is missing from order"
+    if (!customerEmail) {
+      throw new Error(
+        "Customer email is missing from order"
+      );
+    }
+
+    const customerName =
+      escapeHtml(
+        order?.customer?.name ||
+          "Customer"
+      );
+
+    const orderId =
+      escapeHtml(
+        order?._id || ""
+      );
+
+    const phone =
+      escapeHtml(
+        order?.customer?.phone ||
+          ""
+      );
+
+    const total = formatINR(
+      order?.totalPrice
     );
-  }
 
-  const customerName = escapeHtml(
-    order?.customer?.name ||
-      "Customer"
-  );
-
-  const orderId = escapeHtml(
-    order?._id || ""
-  );
-
-  const phone = escapeHtml(
-    order?.customer?.phone || ""
-  );
-
-  const total = formatINR(
-    order?.totalPrice
-  );
-
-  const html = `
+    const html = `
 <!doctype html>
 
 <html>
@@ -365,6 +500,7 @@ const sendOrderConfirmationEmail = async (
   ${orderId}
 </p>
 
+
 <table style="
   width:100%;
   border-collapse:collapse;
@@ -411,9 +547,11 @@ ${renderItems(
 
 </table>
 
+
 <h2>
   Total: ${total}
 </h2>
+
 
 <h3>
   Delivery Address
@@ -422,6 +560,7 @@ ${renderItems(
 <p>
 ${addressHtml(order)}
 </p>
+
 
 <p>
 
@@ -433,6 +572,7 @@ ${phone}
 
 </p>
 
+
 <p>
 
 <strong>
@@ -443,12 +583,15 @@ Cash on Delivery
 
 </p>
 
+
 <p>
   We will keep you updated
   about your order.
 </p>
 
+
 <hr>
+
 
 <p style="
   color:#777;
@@ -466,15 +609,20 @@ Cash on Delivery
 </html>
 `;
 
-  return sendEmail({
-    to: customerEmail,
+    return sendEmail({
+      to: customerEmail,
 
-    subject:
-      `Order Confirmation - #${order._id}`,
+      toName:
+        order?.customer?.name ||
+        "Customer",
 
-    html,
-  });
-};
+      subject:
+        `Order Confirmation - #${order._id}`,
+
+      html,
+    });
+  };
+
 
 /*
 |--------------------------------------------------------------------------
@@ -484,13 +632,12 @@ Cash on Delivery
 
 const sendAdminOrderNotification =
   async (order) => {
-
-    const adminEmail = String(
-      process.env.ORDER_NOTIFICATION_EMAIL ||
-        ""
-    )
-      .trim()
-      .toLowerCase();
+    const adminEmail =
+      String(
+        ORDER_NOTIFICATION_EMAIL
+      )
+        .trim()
+        .toLowerCase();
 
     if (!adminEmail) {
       console.warn(
@@ -501,19 +648,22 @@ const sendAdminOrderNotification =
     }
 
     const items = (
-      Array.isArray(order?.items)
+      Array.isArray(
+        order?.items
+      )
         ? order.items
         : []
     )
       .map((item) => {
+        const quantity =
+          Number(
+            item?.quantity || 1
+          );
 
-        const quantity = Number(
-          item.quantity || 1
-        );
-
-        const price = Number(
-          item.price || 0
-        );
+        const price =
+          Number(
+            item?.price || 0
+          );
 
         return `
           <li style="
@@ -522,7 +672,7 @@ const sendAdminOrderNotification =
 
             <strong>
               ${escapeHtml(
-                item.name ||
+                item?.name ||
                   "Product"
               )}
             </strong>
@@ -575,6 +725,7 @@ const sendAdminOrderNotification =
   New Order Received 🛒
 </h1>
 
+
 <h2>
 
   Order ID:
@@ -585,9 +736,11 @@ const sendAdminOrderNotification =
 
 </h2>
 
+
 <h3>
   Customer
 </h3>
+
 
 <p>
 
@@ -596,40 +749,48 @@ const sendAdminOrderNotification =
 </strong>
 
 ${escapeHtml(
-  order?.customer?.name || ""
+  order?.customer?.name ||
+    ""
 )}
 
 <br>
+
 
 <strong>
   Email:
 </strong>
 
 ${escapeHtml(
-  order?.customer?.email || ""
+  order?.customer?.email ||
+    ""
 )}
 
 <br>
+
 
 <strong>
   Phone:
 </strong>
 
 ${escapeHtml(
-  order?.customer?.phone || ""
+  order?.customer?.phone ||
+    ""
 )}
 
 </p>
 
+
 <h3>
   Products
 </h3>
+
 
 <ul>
 
 ${items}
 
 </ul>
+
 
 <h2>
 
@@ -641,15 +802,18 @@ ${items}
 
 </h2>
 
+
 <h3>
   Delivery Address
 </h3>
+
 
 <p>
 
 ${addressHtml(order)}
 
 </p>
+
 
 <p>
 
@@ -660,6 +824,7 @@ ${addressHtml(order)}
 Cash on Delivery
 
 </p>
+
 
 <p>
 
@@ -682,7 +847,6 @@ ${escapeHtml(
 `;
 
     return sendEmail({
-
       to: adminEmail,
 
       subject:
@@ -692,45 +856,47 @@ ${escapeHtml(
     });
   };
 
+
 /*
 |--------------------------------------------------------------------------
 | CUSTOMER ORDER STATUS EMAIL
 |--------------------------------------------------------------------------
 */
 
-const sendOrderStatusEmail = async (
-  order
-) => {
+const sendOrderStatusEmail =
+  async (order) => {
+    const customerEmail =
+      String(
+        order?.customer?.email ||
+          ""
+      )
+        .trim()
+        .toLowerCase();
 
-  const customerEmail = String(
-    order?.customer?.email || ""
-  )
-    .trim()
-    .toLowerCase();
+    if (!customerEmail) {
+      return null;
+    }
 
-  if (!customerEmail) {
-    return null;
-  }
+    const status =
+      escapeHtml(
+        order?.status ||
+          "Pending"
+      );
 
-  const status = escapeHtml(
-    order?.status ||
-      "Pending"
-  );
+    const customerName =
+      escapeHtml(
+        order?.customer?.name ||
+          "Customer"
+      );
 
-  const customerName =
-    escapeHtml(
-      order?.customer?.name ||
-        "Customer"
-    );
+    const orderId =
+      escapeHtml(
+        order?._id || ""
+      );
 
-  const orderId =
-    escapeHtml(
-      order?._id || ""
-    );
-
-  const reason =
-    order?.cancellationReason
-      ? `
+    const reason =
+      order?.cancellationReason
+        ? `
         <p>
 
           <strong>
@@ -743,9 +909,9 @@ const sendOrderStatusEmail = async (
 
         </p>
       `
-      : "";
+        : "";
 
-  const html = `
+    const html = `
 <!doctype html>
 
 <html>
@@ -760,12 +926,14 @@ const sendOrderStatusEmail = async (
 
 </head>
 
+
 <body style="
   margin:0;
   padding:20px;
   background:#f5f7fa;
   font-family:Arial,sans-serif;
 ">
+
 
 <div style="
   max-width:650px;
@@ -775,9 +943,11 @@ const sendOrderStatusEmail = async (
   border-radius:12px;
 ">
 
+
 <h1>
   Order Update
 </h1>
+
 
 <p>
 
@@ -788,6 +958,7 @@ const sendOrderStatusEmail = async (
   </strong>,
 
 </p>
+
 
 <p>
 
@@ -805,7 +976,9 @@ const sendOrderStatusEmail = async (
 
 </p>
 
+
 ${reason}
+
 
 <p>
 
@@ -816,6 +989,7 @@ ${reason}
   Cash on Delivery
 
 </p>
+
 
 <p>
 
@@ -829,7 +1003,9 @@ ${reason}
 
 </p>
 
+
 <hr>
+
 
 <p style="
   color:#777;
@@ -840,23 +1016,29 @@ ${reason}
 
 </p>
 
+
 </div>
+
 
 </body>
 
 </html>
 `;
 
-  return sendEmail({
+    return sendEmail({
+      to: customerEmail,
 
-    to: customerEmail,
+      toName:
+        order?.customer?.name ||
+        "Customer",
 
-    subject:
-      `Order Update - #${order._id} - ${order.status}`,
+      subject:
+        `Order Update - #${order._id} - ${order.status}`,
 
-    html,
-  });
-};
+      html,
+    });
+  };
+
 
 /*
 |--------------------------------------------------------------------------
@@ -865,15 +1047,9 @@ ${reason}
 */
 
 module.exports = {
-
   verifyEmailConnection,
-
   sendEmail,
-
   sendOrderConfirmationEmail,
-
   sendAdminOrderNotification,
-
   sendOrderStatusEmail,
-
 };
