@@ -1,25 +1,118 @@
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/*
+|--------------------------------------------------------------------------
+| Gmail Configuration
+|--------------------------------------------------------------------------
+|
+| Required environment variables:
+|
+| EMAIL_USER=your-gmail@gmail.com
+| EMAIL_APP_PASSWORD=your-google-app-password
+|
+| IMPORTANT:
+| EMAIL_APP_PASSWORD must be your Gmail App Password,
+| NOT your normal Gmail password.
+|
+|--------------------------------------------------------------------------
+*/
 
-/**
- * Get the sender address.
- *
- * For testing:
- * RESEND_FROM_EMAIL=Waventra Vetric <onboarding@resend.dev>
- *
- * For production, use an email address from your verified domain.
- */
-const getFromEmail = () => {
-  return (
-    process.env.RESEND_FROM_EMAIL ||
-    "Waventra Vetric <onboarding@resend.dev>"
+const EMAIL_USER = String(
+  process.env.EMAIL_USER || ""
+).trim();
+
+const EMAIL_APP_PASSWORD = String(
+  process.env.EMAIL_APP_PASSWORD || ""
+).trim();
+
+let transporter = null;
+
+/*
+|--------------------------------------------------------------------------
+| Create Gmail Transporter
+|--------------------------------------------------------------------------
+*/
+
+if (EMAIL_USER && EMAIL_APP_PASSWORD) {
+  transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_APP_PASSWORD,
+    },
+
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
+  });
+
+  console.log(
+    "Gmail SMTP email service configured successfully"
   );
+} else {
+  console.warn(
+    "Gmail email service is not configured. " +
+      "Missing EMAIL_USER or EMAIL_APP_PASSWORD."
+  );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Verify Gmail SMTP Connection
+|--------------------------------------------------------------------------
+*/
+
+const verifyEmailConnection = async () => {
+  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+    console.error(
+      "Gmail email service is not configured."
+    );
+
+    return false;
+  }
+
+  if (!transporter) {
+    console.error(
+      "Gmail transporter is not available."
+    );
+
+    return false;
+  }
+
+  try {
+    await transporter.verify();
+
+    console.log(
+      "Gmail SMTP connection verified successfully"
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "Gmail SMTP verification failed:",
+      error.message
+    );
+
+    return false;
+  }
 };
 
-/**
- * Escape HTML values before inserting them into email templates.
- */
+
+/*
+|--------------------------------------------------------------------------
+| HTML Escape
+|--------------------------------------------------------------------------
+|
+| Prevents user-provided values from being inserted
+| directly into HTML email markup.
+|
+|--------------------------------------------------------------------------
+*/
+
 const escapeHtml = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -28,69 +121,61 @@ const escapeHtml = (value = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-/**
- * Format Indian Rupee amounts.
- */
+
+/*
+|--------------------------------------------------------------------------
+| Format Indian Rupees
+|--------------------------------------------------------------------------
+*/
+
 const formatINR = (value) =>
   `₹${Number(value || 0).toLocaleString("en-IN")}`;
 
-/**
- * Verify that the Resend service is configured.
- *
- * Unlike SMTP, this does not open a persistent SMTP connection.
- */
-const verifyEmailConnection = async () => {
-  if (!process.env.RESEND_API_KEY) {
-    console.error("RESEND_API_KEY is not configured");
-    return false;
-  }
 
-  try {
-    console.log("Resend email service configured successfully");
-    return true;
-  } catch (error) {
-    console.error(
-      "Resend email verification failed:",
-      error.message
-    );
+/*
+|--------------------------------------------------------------------------
+| Generic Email Sender
+|--------------------------------------------------------------------------
+*/
 
-    return false;
-  }
-};
-
-/**
- * Generic email sender.
- */
-const sendEmail = async ({ to, subject, html }) => {
+const sendEmail = async ({
+  to,
+  subject,
+  html,
+}) => {
   if (!to) {
-    throw new Error("Recipient email is required");
+    throw new Error(
+      "Recipient email is required"
+    );
   }
 
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error("Resend email service is not configured");
+  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+    throw new Error(
+      "Gmail email service is not configured"
+    );
+  }
+
+  if (!transporter) {
+    throw new Error(
+      "Gmail transporter is not available"
+    );
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: getFromEmail(),
-      to: [to],
+    const result = await transporter.sendMail({
+      from: `"Waventra Vetric" <${EMAIL_USER}>`,
+      to,
       subject,
       html,
     });
 
-    if (error) {
-      console.error("Resend email failed:", error);
-
-      throw new Error(
-        error.message || "Failed to send email"
-      );
-    }
-
     console.log(
-      `Email sent successfully: ${data?.id || "unknown"}`
+      `Email sent successfully: ${
+        result.messageId || "unknown"
+      }`
     );
 
-    return data;
+    return result;
   } catch (error) {
     console.error(
       "Email sending error:",
@@ -101,22 +186,34 @@ const sendEmail = async ({ to, subject, html }) => {
   }
 };
 
-/**
- * Render order items as an HTML table.
- */
+
+/*
+|--------------------------------------------------------------------------
+| Render Order Items
+|--------------------------------------------------------------------------
+*/
+
 const renderItems = (items) =>
   (Array.isArray(items) ? items : [])
     .map((item) => {
-      const quantity = Number(item.quantity || 1);
-      const price = Number(item.price || 0);
+      const quantity = Number(
+        item.quantity || 1
+      );
+
+      const price = Number(
+        item.price || 0
+      );
 
       return `
         <tr>
+
           <td style="
             padding:12px;
             border-bottom:1px solid #ddd;
           ">
-            ${escapeHtml(item.name || "Product")}
+            ${escapeHtml(
+              item.name || "Product"
+            )}
           </td>
 
           <td style="
@@ -132,23 +229,41 @@ const renderItems = (items) =>
             border-bottom:1px solid #ddd;
             text-align:right;
           ">
-            ${formatINR(quantity * price)}
+            ${formatINR(
+              quantity * price
+            )}
           </td>
+
         </tr>
       `;
     })
     .join("");
 
-/**
- * Render shipping address.
- */
+
+
+/*
+|--------------------------------------------------------------------------
+| Render Shipping Address
+|--------------------------------------------------------------------------
+*/
+
 const addressHtml = (order) => {
-  const address = order.shippingAddress || {};
+  const address =
+    order?.shippingAddress || {};
 
   return `
-    ${escapeHtml(address.address || "")}<br/>
-    ${escapeHtml(address.city || "")}<br/>
-    ${escapeHtml(address.state || "")}<br/>
+    ${escapeHtml(
+      address.address || ""
+    )}<br/>
+
+    ${escapeHtml(
+      address.city || ""
+    )}<br/>
+
+    ${escapeHtml(
+      address.state || ""
+    )}<br/>
+
     Pincode:
     ${escapeHtml(
       address.postalCode ||
@@ -158,12 +273,18 @@ const addressHtml = (order) => {
   `;
 };
 
-/**
- * Customer order confirmation email.
- */
-const sendOrderConfirmationEmail = async (order) => {
+
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER ORDER CONFIRMATION EMAIL
+|--------------------------------------------------------------------------
+*/
+
+const sendOrderConfirmationEmail = async (
+  order
+) => {
   const customerEmail = String(
-    order.customer?.email || ""
+    order?.customer?.email || ""
   )
     .trim()
     .toLowerCase();
@@ -175,22 +296,35 @@ const sendOrderConfirmationEmail = async (order) => {
   }
 
   const customerName = escapeHtml(
-    order.customer?.name || "Customer"
+    order?.customer?.name ||
+      "Customer"
   );
 
-  const orderId = escapeHtml(order._id);
+  const orderId = escapeHtml(
+    order?._id || ""
+  );
 
   const phone = escapeHtml(
-    order.customer?.phone || ""
+    order?.customer?.phone || ""
   );
 
-  const total = formatINR(order.totalPrice);
+  const total = formatINR(
+    order?.totalPrice
+  );
 
-  const html = `<!doctype html>
+  const html = `
+<!doctype html>
+
 <html>
+
 <head>
+
   <meta charset="UTF-8">
-  <title>Order Confirmation</title>
+
+  <title>
+    Order Confirmation
+  </title>
+
 </head>
 
 <body style="
@@ -208,12 +342,17 @@ const sendOrderConfirmationEmail = async (order) => {
   border-radius:12px;
 ">
 
-<h1 style="color:#0284c7;">
+<h1 style="
+  color:#0284c7;
+">
   Order Confirmed 🎉
 </h1>
 
 <p>
-  Hello <strong>${customerName}</strong>,
+  Hello
+  <strong>
+    ${customerName}
+  </strong>,
 </p>
 
 <p>
@@ -222,9 +361,13 @@ const sendOrderConfirmationEmail = async (order) => {
 </p>
 
 <p>
-  <strong>Order ID:</strong>
+  <strong>
+    Order ID:
+  </strong>
+
   ${orderId}
 </p>
+
 
 <table style="
   width:100%;
@@ -232,6 +375,7 @@ const sendOrderConfirmationEmail = async (order) => {
 ">
 
 <thead>
+
 <tr>
 
 <th style="
@@ -258,17 +402,24 @@ const sendOrderConfirmationEmail = async (order) => {
 </th>
 
 </tr>
+
 </thead>
 
 <tbody>
-${renderItems(order.items)}
+
+${renderItems(
+  order?.items
+)}
+
 </tbody>
 
 </table>
 
+
 <h2>
   Total: ${total}
 </h2>
+
 
 <h3>
   Delivery Address
@@ -278,97 +429,144 @@ ${renderItems(order.items)}
 ${addressHtml(order)}
 </p>
 
-<p>
-  <strong>Phone:</strong>
-  ${phone}
-</p>
 
 <p>
-  <strong>Payment:</strong>
-  Cash on Delivery
+
+<strong>
+  Phone:
+</strong>
+
+${phone}
+
 </p>
 
+
 <p>
-  We will keep you updated about your order.
+
+<strong>
+  Payment:
+</strong>
+
+Cash on Delivery
+
 </p>
+
+
+<p>
+  We will keep you updated
+  about your order.
+</p>
+
 
 <hr>
+
 
 <p style="
   color:#777;
   font-size:12px;
 ">
+
   Waventra Vetric
+
 </p>
 
 </div>
 
 </body>
-</html>`;
+
+</html>
+`;
 
   return sendEmail({
     to: customerEmail,
-    subject: `Order Confirmation - #${order._id}`,
+
+    subject:
+      `Order Confirmation - #${order._id}`,
+
     html,
   });
 };
 
-/**
- * Admin new-order notification.
- */
-const sendAdminOrderNotification = async (order) => {
-  const adminEmail = String(
-    process.env.ORDER_NOTIFICATION_EMAIL || ""
-  )
-    .trim()
-    .toLowerCase();
 
-  if (!adminEmail) {
-    console.warn(
-      "ORDER_NOTIFICATION_EMAIL is not configured"
-    );
+/*
+|--------------------------------------------------------------------------
+| ADMIN NEW ORDER NOTIFICATION
+|--------------------------------------------------------------------------
+*/
 
-    return null;
-  }
+const sendAdminOrderNotification =
+  async (order) => {
 
-  const items = (
-    Array.isArray(order.items)
-      ? order.items
-      : []
-  )
-    .map((item) => {
-      const quantity = Number(
-        item.quantity || 1
+    const adminEmail = String(
+      process.env.ORDER_NOTIFICATION_EMAIL ||
+        ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!adminEmail) {
+      console.warn(
+        "ORDER_NOTIFICATION_EMAIL is not configured"
       );
 
-      const price = Number(
-        item.price || 0
-      );
+      return null;
+    }
 
-      return `
-        <li style="margin-bottom:8px;">
-          <strong>
-            ${escapeHtml(
-              item.name || "Product"
+
+    const items = (
+      Array.isArray(order?.items)
+        ? order.items
+        : []
+    )
+      .map((item) => {
+
+        const quantity = Number(
+          item.quantity || 1
+        );
+
+        const price = Number(
+          item.price || 0
+        );
+
+        return `
+          <li style="
+            margin-bottom:8px;
+          ">
+
+            <strong>
+              ${escapeHtml(
+                item.name ||
+                  "Product"
+              )}
+            </strong>
+
+            × ${quantity}
+
+            —
+
+            ${formatINR(
+              quantity * price
             )}
-          </strong>
 
-          × ${quantity}
+          </li>
+        `;
+      })
+      .join("");
 
-          —
-          ${formatINR(
-            quantity * price
-          )}
-        </li>
-      `;
-    })
-    .join("");
 
-  const html = `<!doctype html>
+    const html = `
+<!doctype html>
+
 <html>
+
 <head>
+
   <meta charset="UTF-8">
-  <title>New Order Received</title>
+
+  <title>
+    New Order Received
+  </title>
+
 </head>
 
 <body style="
@@ -385,134 +583,217 @@ const sendAdminOrderNotification = async (order) => {
   border-radius:12px;
 ">
 
-<h1 style="color:#16a34a;">
+<h1 style="
+  color:#16a34a;
+">
   New Order Received 🛒
 </h1>
 
+
 <h2>
+
   Order ID:
-  ${escapeHtml(order._id)}
+
+  ${escapeHtml(
+    order?._id || ""
+  )}
+
 </h2>
+
 
 <h3>
   Customer
 </h3>
 
+
 <p>
 
-<strong>Name:</strong>
+<strong>
+  Name:
+</strong>
+
 ${escapeHtml(
-  order.customer?.name || ""
+  order?.customer?.name || ""
 )}
 
 <br>
 
-<strong>Email:</strong>
+
+<strong>
+  Email:
+</strong>
+
 ${escapeHtml(
-  order.customer?.email || ""
+  order?.customer?.email || ""
 )}
 
 <br>
 
-<strong>Phone:</strong>
+
+<strong>
+  Phone:
+</strong>
+
 ${escapeHtml(
-  order.customer?.phone || ""
+  order?.customer?.phone || ""
 )}
 
 </p>
+
 
 <h3>
   Products
 </h3>
 
+
 <ul>
+
 ${items}
+
 </ul>
 
+
 <h2>
+
   Total:
-  ${formatINR(order.totalPrice)}
+
+  ${formatINR(
+    order?.totalPrice
+  )}
+
 </h2>
+
 
 <h3>
   Delivery Address
 </h3>
 
+
 <p>
+
 ${addressHtml(order)}
+
 </p>
 
+
 <p>
-<strong>Payment:</strong>
+
+<strong>
+  Payment:
+</strong>
+
 Cash on Delivery
+
 </p>
 
+
 <p>
-<strong>Status:</strong>
+
+<strong>
+  Status:
+</strong>
+
 ${escapeHtml(
-  order.status || "Pending"
+  order?.status ||
+    "Pending"
 )}
+
 </p>
 
 </div>
 
 </body>
-</html>`;
 
-  return sendEmail({
-    to: adminEmail,
-    subject:
-      `New Order Received - #${order._id}`,
-    html,
-  });
-};
+</html>
+`;
 
-/**
- * Customer order status update email.
- */
-const sendOrderStatusEmail = async (order) => {
+
+    return sendEmail({
+
+      to: adminEmail,
+
+      subject:
+        `New Order Received - #${order._id}`,
+
+      html,
+    });
+  };
+
+
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER ORDER STATUS EMAIL
+|--------------------------------------------------------------------------
+*/
+
+const sendOrderStatusEmail = async (
+  order
+) => {
+
   const customerEmail = String(
-    order.customer?.email || ""
+    order?.customer?.email || ""
   )
     .trim()
     .toLowerCase();
+
 
   if (!customerEmail) {
     return null;
   }
 
+
   const status = escapeHtml(
-    order.status || "Pending"
+    order?.status ||
+      "Pending"
   );
 
-  const customerName = escapeHtml(
-    order.customer?.name || "Customer"
-  );
 
-  const orderId = escapeHtml(
-    order._id
-  );
+  const customerName =
+    escapeHtml(
+      order?.customer?.name ||
+        "Customer"
+    );
 
-  const reason = order.cancellationReason
-    ? `
-      <p>
-        <strong>
-          Cancellation reason:
-        </strong>
 
-        ${escapeHtml(
-          order.cancellationReason
-        )}
-      </p>
-    `
-    : "";
+  const orderId =
+    escapeHtml(
+      order?._id || ""
+    );
 
-  const html = `<!doctype html>
+
+  const reason =
+    order?.cancellationReason
+      ? `
+        <p>
+
+          <strong>
+            Cancellation reason:
+          </strong>
+
+          ${escapeHtml(
+            order.cancellationReason
+          )}
+
+        </p>
+      `
+      : "";
+
+
+  const html = `
+<!doctype html>
+
 <html>
+
 <head>
+
   <meta charset="UTF-8">
-  <title>Order Update</title>
+
+  <title>
+    Order Update
+  </title>
+
 </head>
+
 
 <body style="
   margin:0;
@@ -520,6 +801,7 @@ const sendOrderStatusEmail = async (order) => {
   background:#f5f7fa;
   font-family:Arial,sans-serif;
 ">
+
 
 <div style="
   max-width:650px;
@@ -529,59 +811,117 @@ const sendOrderStatusEmail = async (order) => {
   border-radius:12px;
 ">
 
+
 <h1>
   Order Update
 </h1>
 
-<p>
-  Hello <strong>${customerName}</strong>,
-</p>
 
 <p>
-  Your order
-  <strong>#${orderId}</strong>
-  is now
-  <strong>${status}</strong>.
+
+  Hello
+
+  <strong>
+    ${customerName}
+  </strong>,
+
 </p>
+
+
+<p>
+
+  Your order
+
+  <strong>
+    #${orderId}
+  </strong>
+
+  is now
+
+  <strong>
+    ${status}
+  </strong>.
+
+</p>
+
 
 ${reason}
 
-<p>
-  <strong>Payment:</strong>
-  Cash on Delivery
-</p>
 
 <p>
-  <strong>Total:</strong>
-  ${formatINR(order.totalPrice)}
+
+  <strong>
+    Payment:
+  </strong>
+
+  Cash on Delivery
+
 </p>
+
+
+<p>
+
+  <strong>
+    Total:
+  </strong>
+
+  ${formatINR(
+    order?.totalPrice
+  )}
+
+</p>
+
 
 <hr>
+
 
 <p style="
   color:#777;
   font-size:12px;
 ">
+
   Waventra Vetric
+
 </p>
+
 
 </div>
 
+
 </body>
-</html>`;
+
+</html>
+`;
+
 
   return sendEmail({
+
     to: customerEmail,
+
     subject:
       `Order Update - #${order._id} - ${order.status}`,
+
     html,
   });
 };
 
+
+/*
+|--------------------------------------------------------------------------
+| EXPORTS
+|--------------------------------------------------------------------------
+*/
+
 module.exports = {
+
   verifyEmailConnection,
+
   sendEmail,
+
   sendOrderConfirmationEmail,
+
   sendAdminOrderNotification,
+
   sendOrderStatusEmail,
+
 };
