@@ -39,6 +39,11 @@ if (EMAIL_USER && EMAIL_APP_PASSWORD) {
     port: 587,
     secure: false,
 
+    // Force IPv4.
+    // Render was resolving smtp.gmail.com to IPv6 and
+    // returning ENETUNREACH / Connection timeout.
+    family: 4,
+
     auth: {
       user: EMAIL_USER,
       pass: EMAIL_APP_PASSWORD,
@@ -58,7 +63,6 @@ if (EMAIL_USER && EMAIL_APP_PASSWORD) {
       "Missing EMAIL_USER or EMAIL_APP_PASSWORD."
   );
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -101,7 +105,6 @@ const verifyEmailConnection = async () => {
   }
 };
 
-
 /*
 |--------------------------------------------------------------------------
 | HTML Escape
@@ -121,7 +124,6 @@ const escapeHtml = (value = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-
 /*
 |--------------------------------------------------------------------------
 | Format Indian Rupees
@@ -130,7 +132,6 @@ const escapeHtml = (value = "") =>
 
 const formatINR = (value) =>
   `₹${Number(value || 0).toLocaleString("en-IN")}`;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -186,7 +187,6 @@ const sendEmail = async ({
   }
 };
 
-
 /*
 |--------------------------------------------------------------------------
 | Render Order Items
@@ -239,8 +239,6 @@ const renderItems = (items) =>
     })
     .join("");
 
-
-
 /*
 |--------------------------------------------------------------------------
 | Render Shipping Address
@@ -272,7 +270,6 @@ const addressHtml = (order) => {
     )}
   `;
 };
-
 
 /*
 |--------------------------------------------------------------------------
@@ -368,7 +365,6 @@ const sendOrderConfirmationEmail = async (
   ${orderId}
 </p>
 
-
 <table style="
   width:100%;
   border-collapse:collapse;
@@ -415,11 +411,9 @@ ${renderItems(
 
 </table>
 
-
 <h2>
   Total: ${total}
 </h2>
-
 
 <h3>
   Delivery Address
@@ -428,7 +422,6 @@ ${renderItems(
 <p>
 ${addressHtml(order)}
 </p>
-
 
 <p>
 
@@ -440,7 +433,6 @@ ${phone}
 
 </p>
 
-
 <p>
 
 <strong>
@@ -451,15 +443,12 @@ Cash on Delivery
 
 </p>
 
-
 <p>
   We will keep you updated
   about your order.
 </p>
 
-
 <hr>
-
 
 <p style="
   color:#777;
@@ -487,7 +476,6 @@ Cash on Delivery
   });
 };
 
-
 /*
 |--------------------------------------------------------------------------
 | ADMIN NEW ORDER NOTIFICATION
@@ -511,7 +499,6 @@ const sendAdminOrderNotification =
 
       return null;
     }
-
 
     const items = (
       Array.isArray(order?.items)
@@ -553,7 +540,6 @@ const sendAdminOrderNotification =
       })
       .join("");
 
-
     const html = `
 <!doctype html>
 
@@ -589,7 +575,6 @@ const sendAdminOrderNotification =
   New Order Received 🛒
 </h1>
 
-
 <h2>
 
   Order ID:
@@ -600,11 +585,9 @@ const sendAdminOrderNotification =
 
 </h2>
 
-
 <h3>
   Customer
 </h3>
-
 
 <p>
 
@@ -618,7 +601,6 @@ ${escapeHtml(
 
 <br>
 
-
 <strong>
   Email:
 </strong>
@@ -628,7 +610,6 @@ ${escapeHtml(
 )}
 
 <br>
-
 
 <strong>
   Phone:
@@ -640,18 +621,15 @@ ${escapeHtml(
 
 </p>
 
-
 <h3>
   Products
 </h3>
-
 
 <ul>
 
 ${items}
 
 </ul>
-
 
 <h2>
 
@@ -663,18 +641,15 @@ ${items}
 
 </h2>
 
-
 <h3>
   Delivery Address
 </h3>
-
 
 <p>
 
 ${addressHtml(order)}
 
 </p>
-
 
 <p>
 
@@ -685,7 +660,6 @@ ${addressHtml(order)}
 Cash on Delivery
 
 </p>
-
 
 <p>
 
@@ -707,7 +681,6 @@ ${escapeHtml(
 </html>
 `;
 
-
     return sendEmail({
 
       to: adminEmail,
@@ -718,7 +691,6 @@ ${escapeHtml(
       html,
     });
   };
-
 
 /*
 |--------------------------------------------------------------------------
@@ -736,17 +708,14 @@ const sendOrderStatusEmail = async (
     .trim()
     .toLowerCase();
 
-
   if (!customerEmail) {
     return null;
   }
-
 
   const status = escapeHtml(
     order?.status ||
       "Pending"
   );
-
 
   const customerName =
     escapeHtml(
@@ -754,12 +723,10 @@ const sendOrderStatusEmail = async (
         "Customer"
     );
 
-
   const orderId =
     escapeHtml(
       order?._id || ""
     );
-
 
   const reason =
     order?.cancellationReason
@@ -778,7 +745,6 @@ const sendOrderStatusEmail = async (
       `
       : "";
 
-
   const html = `
 <!doctype html>
 
@@ -794,14 +760,12 @@ const sendOrderStatusEmail = async (
 
 </head>
 
-
 <body style="
   margin:0;
   padding:20px;
   background:#f5f7fa;
   font-family:Arial,sans-serif;
 ">
-
 
 <div style="
   max-width:650px;
@@ -811,11 +775,9 @@ const sendOrderStatusEmail = async (
   border-radius:12px;
 ">
 
-
 <h1>
   Order Update
 </h1>
-
 
 <p>
 
@@ -826,7 +788,6 @@ const sendOrderStatusEmail = async (
   </strong>,
 
 </p>
-
 
 <p>
 
@@ -844,9 +805,7 @@ const sendOrderStatusEmail = async (
 
 </p>
 
-
 ${reason}
-
 
 <p>
 
@@ -857,7 +816,6 @@ ${reason}
   Cash on Delivery
 
 </p>
-
 
 <p>
 
@@ -871,9 +829,7 @@ ${reason}
 
 </p>
 
-
 <hr>
-
 
 <p style="
   color:#777;
@@ -884,15 +840,12 @@ ${reason}
 
 </p>
 
-
 </div>
-
 
 </body>
 
 </html>
 `;
-
 
   return sendEmail({
 
@@ -904,7 +857,6 @@ ${reason}
     html,
   });
 };
-
 
 /*
 |--------------------------------------------------------------------------
