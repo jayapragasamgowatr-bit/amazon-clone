@@ -235,6 +235,20 @@ export default function ProductDetails() {
     product?.image ||
     "";
 
+  // Automatically cycle through product images when a gallery exists.
+  useEffect(() => {
+    if (productImages.length <= 1) return undefined;
+
+    const timer = setInterval(() => {
+      setSelectedImage((current) =>
+        (current + 1) % productImages.length
+      );
+      setImageError(false);
+    }, 3500);
+
+    return () => clearInterval(timer);
+  }, [productImages.length]);
+
   /*
   ============================================================
   STOCK

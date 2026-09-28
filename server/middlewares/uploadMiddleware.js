@@ -14,7 +14,7 @@ const upload = multer({
   storage,
   limits: {
     fileSize: MAX_FILE_SIZE,
-    files: 1,
+    files: 8,
   },
   fileFilter: (req, file, cb) => {
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
@@ -25,16 +25,48 @@ const upload = multer({
 });
 
 const validateImageSignature = (req, res, next) => {
-  if (!req.file) return next();
+  const files = Array.isArray(req.files)
+    ? req.files
+    : req.file
+      ? [req.file]
+      : [];
 
-  const b = req.file.buffer;
-  const isJpeg = b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-  const isPng = b.length >= 8 && b.slice(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
-  const isGif = b.length >= 6 && (b.slice(0,6).toString() === "GIF87a" || b.slice(0,6).toString() === "GIF89a");
-  const isWebp = b.length >= 12 && b.slice(0,4).toString() === "RIFF" && b.slice(8,12).toString() === "WEBP";
+  for (const file of files) {
+    const b = file.buffer;
 
-  if (!isJpeg && !isPng && !isGif && !isWebp) {
-    return res.status(400).json({ success: false, message: "Uploaded file is not a valid image." });
+    const isJpeg =
+      b.length >= 3 &&
+      b[0] === 0xff &&
+      b[1] === 0xd8 &&
+      b[2] === 0xff;
+
+    const isPng =
+      b.length >= 8 &&
+      b.slice(0, 8).equals(
+        Buffer.from([
+          137, 80, 78, 71,
+          13, 10, 26, 10,
+        ])
+      );
+
+    const isGif =
+      b.length >= 6 &&
+      (
+        b.slice(0, 6).toString() === "GIF87a" ||
+        b.slice(0, 6).toString() === "GIF89a"
+      );
+
+    const isWebp =
+      b.length >= 12 &&
+      b.slice(0, 4).toString() === "RIFF" &&
+      b.slice(8, 12).toString() === "WEBP";
+
+    if (!isJpeg && !isPng && !isGif && !isWebp) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more uploaded files are not valid images.",
+      });
+    }
   }
 
   next();
@@ -42,3 +74,9 @@ const validateImageSignature = (req, res, next) => {
 
 module.exports = upload;
 module.exports.validateImageSignature = validateImageSignature;
+
+
+// Multiple product-image upload middleware.
+const uploadProductImages = upload.array("images", 8);
+
+module.exports.uploadProductImages = uploadProductImages;

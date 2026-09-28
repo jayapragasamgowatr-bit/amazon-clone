@@ -19,6 +19,7 @@ const {
   createProductReview,
   updateProductReview,
   deleteProductReview,
+  uploadProductImages: uploadProductImagesController,
 } = require("../controllers/productController");
 const {
   getInventory,
@@ -35,6 +36,7 @@ const {
   protect,
   adminOnly,
 } = require("../middlewares/authMiddleware");
+const { uploadProductImages, validateImageSignature } = require("../middlewares/uploadMiddleware");
 
 // ============================================================
 // PUBLIC
@@ -90,6 +92,17 @@ router.get(
   protect,
   adminOnly,
   getInventoryHistory
+);
+
+// POST /api/products/:id/images
+// Upload multiple product images to Cloudinary.
+router.post(
+  "/:id/images",
+  protect,
+  adminOnly,
+  uploadProductImages,
+  validateImageSignature,
+  uploadProductImagesController
 );
 
 // GET /api/products/:id

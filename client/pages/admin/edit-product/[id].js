@@ -1,17 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import toast from "react-hot-toast";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { apiFetch } from "../../../lib/api";
 import { motion } from "framer-motion";
 
+const MAX_IMAGES = 8;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
 export default function EditProductPage() {
   const router = useRouter();
   const { id } = router.query;
-
-  // ============================================================
-  // PRODUCT FORM
-  // ============================================================
 
   const [formData, setFormData] = useState({
     name: "",
@@ -22,823 +21,304 @@ export default function EditProductPage() {
     countInStock: "",
   });
 
-  // ============================================================
-  // SPECIFICATIONS
-  // ============================================================
-
+  const [existingImages, setExistingImages] = useState([]);
+  const [newFiles, setNewFiles] = useState([]);
   const [specifications, setSpecifications] = useState([]);
-
-  // ============================================================
-  // STATE
-  // ============================================================
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ============================================================
-  // FETCH PRODUCT
-  // ============================================================
-
   useEffect(() => {
-    if (!router.isReady || !id) {
-      return;
-    }
-
-    fetchProduct();
+    if (router.isReady && id) fetchProduct();
   }, [router.isReady, id]);
 
   const fetchProduct = async () => {
     try {
       setLoading(true);
-
-      const data = await apiFetch(
-        `/api/products/${id}`,
-        {
-          method: "GET",
-        }
-      );
-
-      // Some APIs return:
-      // { product: {...} }
-      // Others return the product directly.
+      const data = await apiFetch(`/api/products/${id}`);
       const product = data?.product || data?.data?.product || data;
+      if (!product) throw new Error("Product not found");
 
-      if (!product) {
-        throw new Error("Product not found");
-      }
-
-      // ========================================================
-      // PRODUCT DATA
-      // ========================================================
+      const images = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+      if (product.image && !images.includes(product.image)) images.unshift(product.image);
 
       setFormData({
         name: product.name || "",
         price: product.price ?? "",
         description: product.description || "",
-        image: product.image || "",
+        image: product.image || images[0] || "",
         category: product.category || "",
         countInStock: product.countInStock ?? "",
       });
-
-      // ========================================================
-      // SPECIFICATIONS
-      // ========================================================
+      setExistingImages(images.slice(0, MAX_IMAGES));
 
       const specs = product.specifications || {};
-
-      const specificationArray = Object.entries(specs).map(
-        ([key, value]) => ({
-          key,
-          value: String(value ?? ""),
-        })
-      );
-
-      setSpecifications(specificationArray);
+      setSpecifications(Object.entries(specs).map(([key, value]) => ({ key, value: String(value ?? "") })));
     } catch (error) {
       console.error("FETCH PRODUCT ERROR:", error);
-
-      toast.error(
-        error?.message || "Failed to load product"
-      );
+      toast.error(error?.message || "Failed to load product");
     } finally {
       setLoading(false);
     }
   };
 
-  // ============================================================
-  // HANDLE FORM CHANGE
-  // ============================================================
-
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ============================================================
-  // SPECIFICATION CHANGE
-  // ============================================================
+  const handleImageUrlChange = (e) => {
+    const value = e.target.value;
+    setFormData((prev) => ({ ...prev, image: value }));
+  };
 
-  const handleSpecificationChange = (
-    index,
-    field,
-    value
-  ) => {
-    setSpecifications((prev) => {
-      const updated = [...prev];
+  const handleFileChange = (e) => {
+    const selected = Array.from(e.target.files || []);
+    if (!selected.length) return;
 
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-      };
+    const remaining = MAX_IMAGES - existingImages.length - newFiles.length;
+    if (remaining <= 0) {
+      toast.error(`Maximum ${MAX_IMAGES} images allowed.`);
+      e.target.value = "";
+      return;
+    }
 
-      return updated;
+    const valid = selected.filter((file) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name} is not an image.`);
+        return false;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name} is larger than 5 MB.`);
+        return false;
+      }
+      return true;
+    }).slice(0, remaining);
+
+    if (valid.length) {
+      setNewFiles((prev) => [...prev, ...valid]);
+      toast.success(`${valid.length} image${valid.length === 1 ? "" : "s"} selected`);
+    }
+    e.target.value = "";
+  };
+
+  const removeExistingImage = (index) => {
+    setExistingImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setFormData((current) => ({
+        ...current,
+        image: current.image === prev[index] ? (next[0] || "") : current.image,
+      }));
+      return next;
     });
   };
 
-  // ============================================================
-  // ADD SPECIFICATION
-  // ============================================================
-
-  const addSpecification = () => {
-    setSpecifications((prev) => [
-      ...prev,
-      {
-        key: "",
-        value: "",
-      },
-    ]);
+  const removeNewFile = (index) => {
+    setNewFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ============================================================
-  // REMOVE SPECIFICATION
-  // ============================================================
-
-  const removeSpecification = (index) => {
-    setSpecifications((prev) =>
-      prev.filter((_, i) => i !== index)
-    );
+  const specificationChange = (index, field, value) => {
+    setSpecifications((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
   };
 
-  // ============================================================
-  // SUBMIT UPDATE
-  // ============================================================
+  const addSpecification = () => setSpecifications((prev) => [...prev, { key: "", value: "" }]);
+  const removeSpecification = (index) => setSpecifications((prev) => prev.filter((_, i) => i !== index));
+
+  const newFilePreviews = useMemo(
+    () => newFiles.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    [newFiles]
+  );
+
+  useEffect(() => {
+    return () => newFilePreviews.forEach((item) => URL.revokeObjectURL(item.url));
+  }, [newFilePreviews]);
+
+  const uploadNewImages = async () => {
+    if (!newFiles.length) return null;
+
+    const form = new FormData();
+    newFiles.forEach((file) => form.append("images", file));
+
+    return apiFetch(`/api/products/${id}/images`, {
+      method: "POST",
+      auth: true,
+      body: form,
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!id) {
-      toast.error("Invalid product ID");
-      return;
-    }
-
-    // ==========================================================
-    // BASIC VALIDATION
-    // ==========================================================
+    if (!id) return toast.error("Invalid product ID");
 
     const name = String(formData.name || "").trim();
-    const description = String(
-      formData.description || ""
-    ).trim();
-
-    const category = String(
-      formData.category || ""
-    ).trim();
-
-    const image = String(
-      formData.image || ""
-    ).trim();
-
+    const description = String(formData.description || "").trim();
+    const category = String(formData.category || "").trim();
+    const image = String(formData.image || "").trim();
     const price = Number(formData.price);
     const countInStock = Number(formData.countInStock);
 
-    if (!name) {
-      toast.error("Product name is required");
-      return;
-    }
-
-    if (!Number.isFinite(price) || price < 0) {
-      toast.error("Enter a valid product price");
-      return;
-    }
-
-    if (!description) {
-      toast.error("Product description is required");
-      return;
-    }
-
-    if (!Number.isFinite(countInStock) || countInStock < 0) {
-      toast.error("Enter a valid stock quantity");
-      return;
-    }
-
-    // ==========================================================
-    // BUILD SPECIFICATIONS
-    // ==========================================================
+    if (!name) return toast.error("Product name is required");
+    if (!Number.isFinite(price) || price < 0) return toast.error("Enter a valid product price");
+    if (!description) return toast.error("Product description is required");
+    if (!Number.isFinite(countInStock) || countInStock < 0) return toast.error("Enter a valid stock quantity");
 
     const specificationObject = {};
-
-    for (const spec of specifications) {
+    specifications.forEach((spec) => {
       const key = String(spec?.key || "").trim();
       const value = String(spec?.value || "").trim();
+      if (key && value) specificationObject[key] = value;
+    });
 
-      if (key && value) {
-        specificationObject[key] = value;
-      }
-    }
-
-    // ==========================================================
-    // SAVE
-    // ==========================================================
+    // Keep the manually supplied URL as the first image, followed by saved gallery images.
+    const images = Array.from(new Set([image, ...existingImages].filter(Boolean))).slice(0, MAX_IMAGES);
 
     try {
       setSaving(true);
 
-      console.log("UPDATING PRODUCT:", {
-        id,
-        name,
-        price,
-        category,
-        countInStock,
+      await apiFetch(`/api/products/${id}`, {
+        method: "PUT",
+        auth: true,
+        body: {
+          name,
+          price,
+          description,
+          image: images[0] || "",
+          images,
+          category,
+          countInStock,
+          specifications: specificationObject,
+        },
       });
 
-      // ========================================================
-      // IMPORTANT FIX:
-      //
-      // auth: true is REQUIRED here.
-      //
-      // PUT /api/products/:id is protected by:
-      // protect + adminOnly
-      //
-      // apiFetch only sends:
-      // Authorization: Bearer <token>
-      //
-      // when auth: true is supplied.
-      // ========================================================
-
-      const result = await apiFetch(
-        `/api/products/${id}`,
-        {
-          method: "PUT",
-
-          auth: true,
-
-          body: {
-            name,
-            price,
-            description,
-            image,
-            category,
-            countInStock,
-            specifications: specificationObject,
-          },
-        }
-      );
-
-      console.log(
-        "PRODUCT UPDATE SUCCESS:",
-        result
-      );
-
-      toast.success(
-        "Product updated successfully"
-      );
-
-      // Small delay so toast is visible.
-      setTimeout(() => {
-        router.push("/admin/products");
-      }, 500);
-    } catch (error) {
-      console.error(
-        "UPDATE PRODUCT ERROR:",
-        error
-      );
-
-      // ========================================================
-      // AUTH ERROR
-      // ========================================================
-
-      if (
-        error?.message
-          ?.toLowerCase()
-          .includes("not authorized")
-      ) {
-        toast.error(
-          "Admin session expired. Please login again."
-        );
-
-        return;
+      if (newFiles.length) {
+        await uploadNewImages();
       }
 
-      // ========================================================
-      // OTHER ERROR
-      // ========================================================
-
-      toast.error(
-        error?.message ||
-          "Failed to update product"
-      );
+      toast.success("Product updated successfully");
+      setTimeout(() => router.push("/admin/products"), 500);
+    } catch (error) {
+      console.error("UPDATE PRODUCT ERROR:", error);
+      toast.error(error?.message || "Failed to update product");
     } finally {
       setSaving(false);
     }
   };
 
-  // ============================================================
-  // LOADING
-  // ============================================================
-
   if (loading) {
     return (
       <ProtectedRoute>
-        <div
-          style={{
-            maxWidth: "900px",
-            margin: "80px auto",
-            padding: "20px",
-            textAlign: "center",
-          }}
-        >
-          <div
-            className="glass-card"
-            style={{
-              padding: "40px",
-            }}
-          >
-            <h2>
-              Loading product...
-            </h2>
-          </div>
+        <div style={{ maxWidth: 900, margin: "80px auto", padding: 20, textAlign: "center" }}>
+          <div className="glass-card" style={{ padding: 40 }}><h2>Loading product...</h2></div>
         </div>
       </ProtectedRoute>
     );
   }
 
-  // ============================================================
-  // PAGE
-  // ============================================================
-
   return (
     <ProtectedRoute>
-      <main
-        style={{
-          minHeight: "100vh",
-          padding: "40px 20px 80px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "900px",
-            margin: "0 auto",
-          }}
-        >
-          <motion.div
-            initial={{
-              opacity: 0,
-              y: 20,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            className="glass-card"
-            style={{
-              padding: "40px",
-              borderRadius: "24px",
-            }}
-          >
-            {/* ==================================================
-                HEADER
-            ================================================== */}
-
-            <div
-              style={{
-                marginBottom: "30px",
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: "42px",
-                  margin: 0,
-                  marginBottom: "8px",
-                  fontWeight: 900,
-                }}
-              >
-                Edit Product ✏️
-              </h1>
-
-              <p
-                style={{
-                  opacity: 0.65,
-                  margin: 0,
-                }}
-              >
-                Update product information and
-                technical specifications.
-              </p>
+      <main style={{ minHeight: "100vh", padding: "40px 20px 80px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: 40, borderRadius: 24 }}>
+            <div style={{ marginBottom: 30 }}>
+              <h1 style={{ fontSize: 42, margin: 0, marginBottom: 8, fontWeight: 900 }}>Edit Product ✏️</h1>
+              <p style={{ opacity: 0.65, margin: 0 }}>Update product information, gallery images and technical specifications.</p>
             </div>
 
-            {/* ==================================================
-                FORM
-            ================================================== */}
+            <form onSubmit={handleSubmit} style={{ display: "grid", gap: 22 }}>
+              <Field label="Product Name">
+                <input type="text" name="name" value={formData.name} onChange={handleChange} required style={inputStyle} />
+              </Field>
 
-            <form
-              onSubmit={handleSubmit}
-              style={{
-                display: "grid",
-                gap: "22px",
-              }}
-            >
-              {/* =================================================
-                  PRODUCT NAME
-              ================================================= */}
+              <Field label="Price">
+                <input type="number" name="price" value={formData.price} onChange={handleChange} min="0" step="0.01" required style={inputStyle} />
+              </Field>
 
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Product Name
-                </label>
+              <Field label="Category">
+                <input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="Flow Meters" style={inputStyle} />
+              </Field>
 
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Product Name"
-                  required
-                  style={inputStyle}
-                />
-              </div>
+              <Field label="Stock Quantity">
+                <input type="number" name="countInStock" value={formData.countInStock} onChange={handleChange} min="0" step="1" required style={inputStyle} />
+              </Field>
 
-              {/* =================================================
-                  PRICE
-              ================================================= */}
+              <Field label="Description">
+                <textarea name="description" value={formData.description} onChange={handleChange} rows={7} required style={{ ...inputStyle, resize: "vertical", minHeight: 150 }} />
+              </Field>
 
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Price
-                </label>
-
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  placeholder="Price"
-                  min="0"
-                  step="0.01"
-                  required
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* =================================================
-                  CATEGORY
-              ================================================= */}
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Category
-                </label>
-
-                <input
-                  type="text"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  placeholder="Category"
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* =================================================
-                  STOCK
-              ================================================= */}
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Stock Quantity
-                </label>
-
-                <input
-                  type="number"
-                  name="countInStock"
-                  value={formData.countInStock}
-                  onChange={handleChange}
-                  placeholder="Stock Quantity"
-                  min="0"
-                  step="1"
-                  required
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* =================================================
-                  DESCRIPTION
-              ================================================= */}
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Description
-                </label>
-
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Product Description"
-                  rows={7}
-                  required
-                  style={{
-                    ...inputStyle,
-                    resize: "vertical",
-                    minHeight: "150px",
-                  }}
-                />
-              </div>
-
-              {/* =================================================
-                  IMAGE
-              ================================================= */}
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Product Image URL
-                </label>
-
-                <input
-                  type="url"
-                  name="image"
-                  value={formData.image}
-                  onChange={handleChange}
-                  placeholder="https://..."
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* =================================================
-                  IMAGE PREVIEW
-              ================================================= */}
-
-              {formData.image && (
-                <div
-                  style={{
-                    padding: "20px",
-                    borderRadius: "16px",
-                    border:
-                      "1px solid rgba(255,255,255,0.1)",
-                    textAlign: "center",
-                  }}
-                >
-                  <p
-                    style={{
-                      marginTop: 0,
-                      opacity: 0.6,
-                      fontSize: "13px",
-                    }}
-                  >
-                    Image Preview
-                  </p>
-
-                  <img
-                    src={formData.image}
-                    alt={formData.name || "Product"}
-                    style={{
-                      maxWidth: "280px",
-                      maxHeight: "220px",
-                      objectFit: "contain",
-                      borderRadius: "12px",
-                    }}
-                    onError={(e) => {
-                      e.currentTarget.style.display =
-                        "none";
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* =================================================
-                  SPECIFICATIONS
-              ================================================= */}
-
-              <section
-                style={{
-                  padding: "24px",
-                  borderRadius: "20px",
-                  border:
-                    "1px solid rgba(255,255,255,0.1)",
-                  background:
-                    "rgba(255,255,255,0.03)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    alignItems: "center",
-                    gap: "15px",
-                    marginBottom: "20px",
-                    flexWrap: "wrap",
-                  }}
-                >
+              <section style={sectionStyle}>
+                <div style={sectionHeaderStyle}>
                   <div>
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontSize: "24px",
-                      }}
-                    >
-                      Technical Specifications
-                    </h2>
-
-                    <p
-                      style={{
-                        opacity: 0.6,
-                        margin:
-                          "6px 0 0",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Add product-specific
-                      technical details.
+                    <h2 style={{ margin: 0, fontSize: 24 }}>Product Images</h2>
+                    <p style={{ opacity: 0.65, margin: "6px 0 0", fontSize: 14 }}>
+                      Upload up to {MAX_IMAGES} images. The first image is used as the main product image.
                     </p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={
-                      addSpecification
-                    }
-                    style={buttonStyle}
-                  >
-                    + Add Specification
-                  </button>
+                  <strong>{existingImages.length + newFiles.length}/{MAX_IMAGES}</strong>
                 </div>
 
-                {/* =================================================
-                    EMPTY SPECIFICATIONS
-                ================================================= */}
+                <Field label="Main Image URL (optional)">
+                  <input type="url" value={formData.image} onChange={handleImageUrlChange} placeholder="https://..." style={inputStyle} />
+                </Field>
 
-                {specifications.length === 0 ? (
-                  <div
-                    style={{
-                      textAlign: "center",
-                      padding: "25px",
-                      opacity: 0.6,
-                    }}
-                  >
-                    No specifications
-                    added yet.
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "12px",
-                    }}
-                  >
-                    {specifications.map(
-                      (spec, index) => (
-                        <div
-                          key={index}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "1fr 1fr auto",
-                            gap: "10px",
-                            alignItems:
-                              "center",
-                          }}
-                        >
-                          {/* KEY */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={uploadLabel}>
+                    <span style={{ fontSize: 18 }}>📷</span>
+                    Upload Multiple Images
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={handleFileChange} hidden />
+                  </label>
+                  <p style={{ opacity: 0.55, fontSize: 12, marginTop: 8 }}>JPEG, PNG, WEBP or GIF • Maximum 5 MB each</p>
+                </div>
 
-                          <input
-                            type="text"
-                            placeholder="Specification"
-                            value={
-                              spec.key
-                            }
-                            onChange={(e) =>
-                              handleSpecificationChange(
-                                index,
-                                "key",
-                                e.target.value
-                              )
-                            }
-                            style={
-                              inputStyle
-                            }
-                          />
-
-                          {/* VALUE */}
-
-                          <input
-                            type="text"
-                            placeholder="Value"
-                            value={
-                              spec.value
-                            }
-                            onChange={(e) =>
-                              handleSpecificationChange(
-                                index,
-                                "value",
-                                e.target.value
-                              )
-                            }
-                            style={
-                              inputStyle
-                            }
-                          />
-
-                          {/* REMOVE */}
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeSpecification(
-                                index
-                              )
-                            }
-                            style={{
-                              ...buttonStyle,
-                              background:
-                                "rgba(239,68,68,0.2)",
-                              color:
-                                "#fca5a5",
-                              padding:
-                                "10px 14px",
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      )
-                    )}
+                {(existingImages.length > 0 || newFilePreviews.length > 0) && (
+                  <div style={galleryGrid}>
+                    {existingImages.map((src, index) => (
+                      <div key={`existing-${src}-${index}`} style={imageCard}>
+                        <img src={src} alt={`${formData.name} ${index + 1}`} style={thumbStyle} />
+                        {index === 0 && <span style={mainBadge}>MAIN</span>}
+                        <button type="button" onClick={() => removeExistingImage(index)} style={removeImageButton}>×</button>
+                      </div>
+                    ))}
+                    {newFilePreviews.map((item, index) => (
+                      <div key={`new-${item.file.name}-${index}`} style={imageCard}>
+                        <img src={item.url} alt={item.file.name} style={thumbStyle} />
+                        <span style={newBadge}>NEW</span>
+                        <button type="button" onClick={() => removeNewFile(index)} style={removeImageButton}>×</button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </section>
 
-              {/* =================================================
-                  ACTIONS
-              ================================================= */}
+              <section style={sectionStyle}>
+                <div style={sectionHeaderStyle}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: 24 }}>Technical Specifications</h2>
+                    <p style={{ opacity: 0.6, margin: "6px 0 0", fontSize: 14 }}>Add product-specific technical details.</p>
+                  </div>
+                  <button type="button" onClick={addSpecification} style={buttonStyle}>+ Add Specification</button>
+                </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent:
-                    "flex-end",
-                  gap: "12px",
-                  marginTop: "10px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      "/admin/products"
-                    )
-                  }
-                  disabled={saving}
-                  style={{
-                    ...buttonStyle,
-                    background:
-                      "rgba(255,255,255,0.1)",
-                  }}
-                >
-                  Cancel
-                </button>
+                {specifications.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 25, opacity: 0.6 }}>No specifications added yet.</div>
+                ) : (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {specifications.map((spec, index) => (
+                      <div key={index} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "center" }}>
+                        <input type="text" placeholder="Specification" value={spec.key} onChange={(e) => specificationChange(index, "key", e.target.value)} style={inputStyle} />
+                        <input type="text" placeholder="Value" value={spec.value} onChange={(e) => specificationChange(index, "value", e.target.value)} style={inputStyle} />
+                        <button type="button" onClick={() => removeSpecification(index)} style={{ ...buttonStyle, background: "rgba(239,68,68,0.2)", color: "#fca5a5", padding: "10px 14px" }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
 
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={{
-                    ...buttonStyle,
-                    minWidth: "150px",
-                  }}
-                >
-                  {saving
-                    ? "Saving..."
-                    : "Save Changes"}
-                </button>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => router.push("/admin/products")} disabled={saving} style={{ ...buttonStyle, background: "rgba(255,255,255,0.1)" }}>Cancel</button>
+                <button type="submit" disabled={saving} style={{ ...buttonStyle, minWidth: 180 }}>{saving ? "Saving..." : "Save Changes"}</button>
               </div>
             </form>
           </motion.div>
@@ -848,31 +328,122 @@ export default function EditProductPage() {
   );
 }
 
-// ============================================================
-// STYLES
-// ============================================================
+function Field({ label, children }) {
+  return (
+    <div>
+      <label style={{ display: "block", marginBottom: 8, fontWeight: 700 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
 
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box",
   padding: "14px 16px",
-  borderRadius: "12px",
-  border:
-    "1px solid rgba(255,255,255,0.12)",
-  background:
-    "rgba(255,255,255,0.06)",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.06)",
   color: "inherit",
   outline: "none",
-  fontSize: "15px",
+  fontSize: 15,
 };
 
 const buttonStyle = {
   border: 0,
-  borderRadius: "12px",
+  borderRadius: 12,
   padding: "12px 18px",
   color: "#fff",
-  background:
-    "linear-gradient(135deg,#7c3aed,#06b6d4)",
+  background: "linear-gradient(135deg,#7c3aed,#06b6d4)",
   fontWeight: 800,
   cursor: "pointer",
+};
+
+const sectionStyle = {
+  padding: 24,
+  borderRadius: 20,
+  border: "1px solid rgba(255,255,255,0.1)",
+  background: "rgba(255,255,255,0.03)",
+};
+
+const sectionHeaderStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 15,
+  marginBottom: 20,
+  flexWrap: "wrap",
+};
+
+const uploadLabel = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "13px 18px",
+  borderRadius: 12,
+  cursor: "pointer",
+  color: "#fff",
+  background: "linear-gradient(135deg,#06b6d4,#7c3aed)",
+  fontWeight: 800,
+};
+
+const galleryGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))",
+  gap: 14,
+  marginTop: 20,
+};
+
+const imageCard = {
+  position: "relative",
+  minHeight: 150,
+  overflow: "hidden",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(0,0,0,0.2)",
+};
+
+const thumbStyle = {
+  width: "100%",
+  height: 150,
+  display: "block",
+  objectFit: "cover",
+};
+
+const removeImageButton = {
+  position: "absolute",
+  top: 7,
+  right: 7,
+  width: 30,
+  height: 30,
+  border: 0,
+  borderRadius: "50%",
+  background: "rgba(0,0,0,0.72)",
+  color: "#fff",
+  fontSize: 22,
+  cursor: "pointer",
+};
+
+const mainBadge = {
+  position: "absolute",
+  left: 8,
+  bottom: 8,
+  padding: "4px 7px",
+  borderRadius: 6,
+  background: "rgba(6,182,212,0.9)",
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const newBadge = {
+  position: "absolute",
+  left: 8,
+  bottom: 8,
+  padding: "4px 7px",
+  borderRadius: 6,
+  background: "rgba(124,58,237,0.9)",
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: 900,
 };

@@ -1,0 +1,19 @@
+import Link from "next/link";
+import SEO from "../components/SEO";
+
+export default function TermsConditions(){return <>
+<SEO title="Terms & Conditions | Waventra Vetric" description="Terms and conditions for using Waventra Vetric." path="/terms-conditions" />
+<main className="legal-page"><div className="legal-card"><div className="eyebrow">Legal</div><h1>Terms & Conditions</h1><p className="lead">These terms describe the general rules for using the Waventra Vetric website, creating an account, placing orders, and using its ecommerce features.</p>
+<Section title="1. Website use">Use the website lawfully and do not attempt to interfere with its operation, security, accounts, or data.</Section>
+<Section title="2. Accounts">You are responsible for the information you provide and for keeping your login credentials secure. Account activity performed through your credentials may be associated with your account.</Section>
+<Section title="3. Products and information">Product names, descriptions, images, prices, availability, and other information may change. Product images are intended to represent the products but may vary from the physical item.</Section>
+<Section title="4. Orders">Submitting an order is a request to purchase the selected products. An order may be subject to availability, validation, pricing checks, and other applicable order conditions.</Section>
+<Section title="5. Pricing and payment">Prices and applicable charges are shown during the shopping and checkout process. Payment must be completed using the payment method made available at checkout.</Section>
+<Section title="6. Cancellation, returns and refunds">Cancellation, return, replacement, and refund eligibility depends on the applicable order status and the policies presented by the business. Where a specific policy is published, that policy will govern the applicable transaction.</Section>
+<Section title="7. Intellectual property">Website content, branding, interface elements, text, graphics, and software may be protected by applicable intellectual-property rights. Do not copy or reuse protected material without permission.</Section>
+<Section title="8. Availability and changes">Features may be modified, suspended, or updated to maintain and improve the service. We may update these terms when business practices or legal requirements change.</Section>
+<Section title="9. Contact">For questions about an order or these terms, use the Contact page or the support details provided by the business.</Section>
+<p className="note">This is website-ready informational content and should be reviewed against your actual commercial, cancellation, return, warranty, and legal practices before publication as your final terms.</p><Link className="back" href="/">← Back to Home</Link>
+</div></main><style jsx>{styles}</style></>}
+function Section({title,children}){return <section><h2>{title}</h2><p>{children}</p></section>}
+const styles=`.legal-page{max-width:1000px;margin:0 auto;padding:70px 24px 30px;min-height:65vh}.legal-card{border:1px solid rgba(255,255,255,.09);background:rgba(15,23,42,.62);border-radius:22px;padding:clamp(24px,5vw,44px);backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.16)}.eyebrow{color:#67e8f9;font-size:12px;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;margin-bottom:10px}.legal-card h1{margin:0;font-size:clamp(38px,6vw,58px);font-weight:900}.lead{color:#aeb9cd;line-height:1.8;font-size:16px;margin:15px 0 30px}.legal-card section{padding:20px 0;border-top:1px solid rgba(255,255,255,.07)}.legal-card h2{font-size:20px;margin:0 0 9px}.legal-card section p{margin:0;color:#cbd5e1;line-height:1.8}.note{margin:28px 0 18px;padding:15px;border-radius:12px;background:rgba(103,232,249,.05);border:1px solid rgba(103,232,249,.12);color:#9fb0c8;line-height:1.7;font-size:13px}.back{display:inline-block;margin-top:8px;color:#67e8f9;font-weight:800;text-decoration:none}`;

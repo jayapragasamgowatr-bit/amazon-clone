@@ -67,6 +67,12 @@ const productSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Additional product images used by the product gallery.
+    images: {
+      type: [String],
+      default: [],
+    },
+
     category: {
       type: String,
       default: "",

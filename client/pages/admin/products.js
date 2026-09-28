@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -85,6 +85,27 @@ export default function AdminProducts() {
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState(emptyForm);
+
+  // Multi-image upload state for the inline Add/Edit Product form.
+  const MAX_IMAGES = 8;
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
+  const [existingImages, setExistingImages] = useState([]);
+  const [newFiles, setNewFiles] = useState([]);
+
+  const newFilePreviews = useMemo(
+    () =>
+      newFiles.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+      })),
+    [newFiles]
+  );
+
+  useEffect(() => {
+    return () => {
+      newFilePreviews.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, [newFilePreviews]);
 
   const [specKey, setSpecKey] = useState("");
   const [specValue, setSpecValue] = useState("");
@@ -421,11 +442,103 @@ export default function AdminProducts() {
   };
 
   // =====================================================
+  // PRODUCT IMAGE UPLOAD
+  // =====================================================
+
+  const handleProductFiles = (e) => {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = "";
+
+    if (!selected.length) return;
+
+    const remaining = MAX_IMAGES - existingImages.length - newFiles.length;
+
+    if (remaining <= 0) {
+      toast.error(`Maximum ${MAX_IMAGES} images allowed.`);
+      return;
+    }
+
+    const valid = selected.filter((file) => {
+      const allowed = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+      ].includes(file.type);
+
+      if (!allowed) {
+        toast.error(`${file.name}: only JPG, PNG, WEBP and GIF are allowed.`);
+        return false;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name}: maximum file size is 5 MB.`);
+        return false;
+      }
+
+      return true;
+    }).slice(0, remaining);
+
+    if (valid.length) {
+      setNewFiles((prev) => [...prev, ...valid]);
+      toast.success(`${valid.length} image${valid.length === 1 ? "" : "s"} selected.`);
+    }
+  };
+
+  const removeExistingProductImage = (index) => {
+    setExistingImages((prev) => {
+      const removed = prev[index];
+      const next = prev.filter((_, i) => i !== index);
+
+      setForm((current) => ({
+        ...current,
+        image: current.image === removed ? (next[0] || "") : current.image,
+      }));
+
+      return next;
+    });
+  };
+
+  const removeNewProductFile = (index) => {
+    setNewFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadProductFiles = async (productId) => {
+    if (!productId || !newFiles.length) return null;
+
+    const uploadForm = new FormData();
+
+    newFiles.forEach((file) => {
+      uploadForm.append("images", file);
+    });
+
+    return apiFetch(`/api/products/${productId}/images`, {
+      method: "POST",
+      auth: true,
+      body: uploadForm,
+    });
+  };
+
+  const getProductImageList = (product) => {
+    const images = Array.isArray(product?.images)
+      ? product.images.filter(Boolean)
+      : [];
+
+    if (product?.image && !images.includes(product.image)) {
+      images.unshift(product.image);
+    }
+
+    return images.slice(0, MAX_IMAGES);
+  };
+
+  // =====================================================
   // OPEN ADD FORM
   // =====================================================
 
   const openAddForm = () => {
     setEditingId(null);
+    setExistingImages([]);
+    setNewFiles([]);
 
     setForm({
       ...emptyForm,
@@ -448,6 +561,8 @@ export default function AdminProducts() {
 
   const openEditForm = (product) => {
     setEditingId(product._id);
+    setExistingImages(getProductImageList(product));
+    setNewFiles([]);
 
     setForm({
       name: product.name || "",
@@ -503,6 +618,8 @@ export default function AdminProducts() {
 
     setShowForm(false);
     setEditingId(null);
+    setExistingImages([]);
+    setNewFiles([]);
 
     setSpecKey("");
     setSpecValue("");
@@ -561,6 +678,13 @@ export default function AdminProducts() {
     try {
       setSaving(true);
 
+      const imageUrls = Array.from(
+        new Set([
+          form.image.trim(),
+          ...existingImages,
+        ].filter(Boolean))
+      ).slice(0, MAX_IMAGES);
+
       const payload = {
         name: form.name.trim(),
 
@@ -575,7 +699,10 @@ export default function AdminProducts() {
           Number(form.countInStock),
 
         image:
-          form.image.trim(),
+          imageUrls[0] || "",
+
+        images:
+          imageUrls,
 
         specifications:
           form.specifications,
@@ -602,6 +729,10 @@ export default function AdminProducts() {
           payload
         );
 
+        if (newFiles.length) {
+          await uploadProductFiles(editingId);
+        }
+
         toast.success(
           "Product updated successfully"
         );
@@ -616,9 +747,18 @@ export default function AdminProducts() {
           "CREATING PRODUCT"
         );
 
-        await createProduct(
+        const created = await createProduct(
           payload
         );
+
+        const createdProduct =
+          created?.product ||
+          created?.data?.product ||
+          created;
+
+        if (newFiles.length && createdProduct?._id) {
+          await uploadProductFiles(createdProduct._id);
+        }
 
         toast.success(
           "Product created successfully"
@@ -1388,22 +1528,84 @@ export default function AdminProducts() {
                   </FormField>
 
                   <FormField
-                    label="Image URL"
+                    label="Product Images"
                     full
                   >
+                    <div className="product-image-manager">
+                      <div className="image-manager-head">
+                        <div>
+                          <strong>Multiple Product Images</strong>
+                          <span>
+                            Upload up to {MAX_IMAGES} images. The first image is the main product image.
+                          </span>
+                        </div>
+                        <b>
+                          {existingImages.length + newFiles.length}/{MAX_IMAGES}
+                        </b>
+                      </div>
 
-                    <input
-                      type="url"
-                      name="image"
-                      value={
-                        form.image
-                      }
-                      onChange={
-                        handleChange
-                      }
-                      placeholder="https://..."
-                    />
+                      <input
+                        type="url"
+                        name="image"
+                        value={form.image}
+                        onChange={handleChange}
+                        placeholder="Optional main image URL: https://..."
+                      />
 
+                      <label className="image-upload-button">
+                        <span>📷</span>
+                        Choose Multiple Images
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          multiple
+                          onChange={handleProductFiles}
+                          disabled={saving || existingImages.length + newFiles.length >= MAX_IMAGES}
+                          hidden
+                        />
+                      </label>
+
+                      <small>
+                        JPG, PNG, WEBP or GIF • Maximum 5 MB each
+                      </small>
+
+                      {(existingImages.length > 0 || newFiles.length > 0) && (
+                        <div className="admin-image-grid">
+                          {existingImages.map((src, index) => (
+                            <div className="admin-image-card" key={`existing-${src}-${index}`}>
+                              <img src={src} alt={`${form.name || "Product"} ${index + 1}`} />
+                              {index === 0 && <span className="main-image-badge">MAIN</span>}
+                              <button
+                                type="button"
+                                onClick={() => removeExistingProductImage(index)}
+                                disabled={saving}
+                                aria-label="Remove image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+
+                          {newFilePreviews.map((item, index) => (
+                            <div className="admin-image-card" key={`new-${item.file.name}-${index}`}>
+                              <img
+                                src={item.url}
+                                alt={item.file.name}
+                              />
+                              <span className="new-image-badge">NEW</span>
+                              <button
+                                type="button"
+                                onClick={() => removeNewProductFile(index)}
+                                disabled={saving}
+                                aria-label="Remove image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </FormField>
 
                   <FormField
@@ -2367,6 +2569,116 @@ export default function AdminProducts() {
           border-radius: 24px;
           background: linear-gradient(145deg, #0b1428, #11172e 55%, #0b2534);
           box-shadow: 0 35px 100px rgba(0,0,0,.55);
+        }
+
+        .product-image-manager {
+          display: grid;
+          gap: 12px;
+          padding: 14px;
+          border: 1px solid rgba(148,163,184,.16);
+          border-radius: 14px;
+          background: rgba(7,13,31,.22);
+        }
+
+        .image-manager-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .image-manager-head > div {
+          display: grid;
+          gap: 4px;
+        }
+
+        .image-manager-head span,
+        .product-image-manager small {
+          color: #8fa0b8;
+          font-size: 12px;
+        }
+
+        .image-manager-head b {
+          white-space: nowrap;
+          color: #7dd3fc;
+        }
+
+        .image-upload-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 46px;
+          padding: 0 16px;
+          border: 1px dashed rgba(56,189,248,.5);
+          border-radius: 11px;
+          background: rgba(14,165,233,.08);
+          color: #bae6fd;
+          cursor: pointer;
+          font-weight: 800;
+        }
+
+        .image-upload-button:hover {
+          background: rgba(14,165,233,.14);
+        }
+
+        .image-upload-button:has(input:disabled) {
+          opacity: .5;
+          cursor: not-allowed;
+        }
+
+        .admin-image-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+          gap: 10px;
+        }
+
+        .admin-image-card {
+          position: relative;
+          aspect-ratio: 1;
+          overflow: hidden;
+          border-radius: 12px;
+          border: 1px solid rgba(148,163,184,.18);
+          background: rgba(15,23,42,.6);
+        }
+
+        .admin-image-card img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .admin-image-card > button {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          width: 28px;
+          height: 28px;
+          border: 0;
+          border-radius: 50%;
+          background: rgba(0,0,0,.72);
+          color: #fff;
+          font-size: 18px;
+          line-height: 1;
+          cursor: pointer;
+        }
+
+        .main-image-badge,
+        .new-image-badge {
+          position: absolute;
+          left: 6px;
+          bottom: 6px;
+          padding: 4px 7px;
+          border-radius: 6px;
+          background: rgba(2,132,199,.9);
+          color: #fff;
+          font-size: 9px;
+          font-weight: 900;
+        }
+
+        .new-image-badge {
+          background: rgba(22,163,74,.9);
         }
 
         .modal-header {

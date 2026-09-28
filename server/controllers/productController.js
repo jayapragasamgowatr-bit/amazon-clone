@@ -2,6 +2,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const InventoryTransaction = require("../models/InventoryTransaction");
 const { validateSpecifications, validateStringArray, validateReview } = require("../utils/validation");
+const cloudinary = require("../config/cloudinary");
 
 const escapeRegex = (value) =>
   String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -464,6 +465,7 @@ const createProduct = async (
       price,
       description,
       image,
+      images,
       category,
       countInStock,
       specifications,
@@ -590,7 +592,10 @@ const createProduct = async (
           description.trim(),
 
         image:
-          image || "",
+          image || (Array.isArray(images) && images[0]) || "",
+
+        images:
+          Array.isArray(images) ? images.filter((item) => typeof item === "string" && item.trim()).slice(0, 8) : [],
 
         category:
           String(category || "").trim(),
@@ -654,6 +659,7 @@ const updateProduct = async (
       price,
       description,
       image,
+      images,
       category,
       countInStock,
       specifications,
@@ -729,7 +735,22 @@ const updateProduct = async (
       image !== undefined
     ) {
       product.image =
-        String(image);
+        String(image || "");
+    }
+
+    if (images !== undefined) {
+      if (!Array.isArray(images)) {
+        return res.status(400).json({ success: false, message: "Images must be an array." });
+      }
+
+      product.images = images
+        .filter((item) => typeof item === "string" && item.trim())
+        .map((item) => item.trim())
+        .slice(0, 8);
+
+      if (!product.image && product.images.length) {
+        product.image = product.images[0];
+      }
     }
 
     // --------------------------------------------------------
@@ -846,6 +867,87 @@ const updateProduct = async (
       error.message
     );
 
+    next(error);
+  }
+};
+
+// ============================================================
+// UPLOAD PRODUCT IMAGES
+// POST /api/products/:id/images
+// ADMIN
+// ============================================================
+
+const uploadProductImages = async (req, res, next) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found.",
+      });
+    }
+
+    if (!Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one image.",
+      });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({
+        success: false,
+        message: "Cloudinary image storage is not configured on the server.",
+      });
+    }
+
+    const currentImages = Array.isArray(product.images) ? product.images : [];
+    if (currentImages.length + req.files.length > 8) {
+      return res.status(400).json({
+        success: false,
+        message: `A product can have a maximum of 8 images. It currently has ${currentImages.length}.`,
+      });
+    }
+
+    const uploadOne = (file) => new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "waventravetric/products",
+          resource_type: "image",
+          transformation: [
+            { width: 1600, height: 1600, crop: "limit", quality: "auto", fetch_format: "auto" },
+          ],
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result.secure_url);
+        }
+      );
+      stream.end(file.buffer);
+    });
+
+    const uploadedUrls = [];
+    for (const file of req.files) {
+      uploadedUrls.push(await uploadOne(file));
+    }
+
+    product.images = [...currentImages, ...uploadedUrls].slice(0, 8);
+    if (!product.image && product.images.length) {
+      product.image = product.images[0];
+    }
+
+    await product.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${uploadedUrls.length} image${uploadedUrls.length === 1 ? "" : "s"} uploaded successfully.`,
+      images: product.images,
+      image: product.image,
+      product,
+    });
+  } catch (error) {
+    console.error("UPLOAD PRODUCT IMAGES ERROR:", error.message);
     next(error);
   }
 };
@@ -1290,6 +1392,7 @@ module.exports = {
   getProductById,
   createProduct,
   updateProduct,
+  uploadProductImages,
   deleteProduct,
   createProductReview,
   updateProductReview,

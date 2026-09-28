@@ -133,22 +133,22 @@ export default function Footer() {
           </h3>
 
           <FooterLink
-            href="#"
+            href="/help-center"
             label="Help Center"
           />
 
           <FooterLink
-            href="#"
+            href="/privacy-policy"
             label="Privacy Policy"
           />
 
           <FooterLink
-            href="#"
+            href="/terms-conditions"
             label="Terms & Conditions"
           />
 
           <FooterLink
-            href="#"
+            href="/contact"
             label="Contact"
           />
         </div>

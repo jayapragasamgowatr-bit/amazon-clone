@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -602,14 +602,56 @@ function ProductCard({
   wishlisted,
   onWishlist,
 }) {
-  const image =
-    product?.image ||
-    product?.images?.[0] ||
-    "";
+  const imageList = useMemo(() => {
+    const values = [
+      product?.image,
+      ...(Array.isArray(product?.images)
+        ? product.images
+        : []),
+    ].filter(Boolean);
+
+    return [...new Set(values)];
+  }, [product]);
+
+  const [imageIndex, setImageIndex] = useState(0);
+  const hoverTimerRef = useRef(null);
 
   const stock = Number(
     product?.countInStock || 0
   );
+
+  const clearImageTimer = () => {
+    if (hoverTimerRef.current) {
+      clearInterval(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  const handleImageMouseEnter = () => {
+    if (imageList.length <= 1) return;
+
+    clearImageTimer();
+
+    hoverTimerRef.current = setInterval(() => {
+      setImageIndex((current) =>
+        (current + 1) % imageList.length
+      );
+    }, 1500);
+  };
+
+  const handleImageMouseLeave = () => {
+    clearImageTimer();
+    setImageIndex(0);
+  };
+
+  useEffect(() => {
+    setImageIndex(0);
+    clearImageTimer();
+
+    return () => clearImageTimer();
+  }, [product?._id, imageList.length]);
+
+  const image = imageList[imageIndex] || "";
 
   return (
     <motion.div
@@ -623,20 +665,56 @@ function ProductCard({
 
         <Link
           href={`/product/${product._id}`}
+          onMouseEnter={handleImageMouseEnter}
+          onMouseLeave={handleImageMouseLeave}
         >
-          {image ? (
-            <img
-              src={image}
-              alt={
-                product.name ||
-                "Product"
-              }
-            />
+          {imageList.length > 0 ? (
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                minHeight: "210px",
+                overflow: "hidden",
+              }}
+            >
+              {imageList.map((imageUrl, index) => (
+                <img
+                  key={`${product._id || product.id}-image-${index}`}
+                  src={imageUrl}
+                  alt={product.name || "Product"}
+                  loading={index === 0 ? "eager" : "lazy"}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    padding: "20px",
+                    boxSizing: "border-box",
+                    opacity: index === imageIndex ? 1 : 0,
+                    transform: index === imageIndex ? "scale(1)" : "scale(1.015)",
+                    transition: "opacity 0.7s ease-in-out, transform 0.7s ease-in-out",
+                    pointerEvents: "none",
+                    zIndex: index === imageIndex ? 2 : 1,
+                  }}
+                />
+              ))}
+            </div>
           ) : (
             <div className="no-image">
-              <Package
-                size={50}
-              />
+              <Package size={50} />
+            </div>
+          )}
+
+          {imageList.length > 1 && (
+            <div className="image-dots" aria-hidden="true">
+              {imageList.map((_, index) => (
+                <span
+                  key={index}
+                  className={index === imageIndex ? "dot active" : "dot"}
+                />
+              ))}
             </div>
           )}
         </Link>
@@ -767,6 +845,51 @@ function ProductCard({
           object-fit: contain;
           padding: 20px;
           box-sizing: border-box;
+        }
+
+        .image-container > a {
+          position: relative;
+          height: 100%;
+          display: block;
+          overflow: hidden;
+        }
+
+        .image-container img {
+          transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .image-container > a:hover img {
+          transform: scale(1.025);
+        }
+
+        .image-dots {
+          position: absolute;
+          left: 50%;
+          bottom: 10px;
+          transform: translateX(-50%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          padding: 5px 7px;
+          border-radius: 999px;
+          background: rgba(0, 0, 0, 0.38);
+          backdrop-filter: blur(6px);
+          pointer-events: none;
+        }
+
+        .dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.5);
+          transition: all 0.2s ease;
+        }
+
+        .dot.active {
+          width: 7px;
+          height: 7px;
+          background: #ffffff;
         }
 
         .no-image {

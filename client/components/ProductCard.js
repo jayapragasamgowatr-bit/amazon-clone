@@ -7,6 +7,13 @@ import {
 } from "framer-motion";
 
 import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import {
   Heart,
   ShoppingCart,
   Star,
@@ -72,6 +79,58 @@ export default function ProductCard({
           ?.length ??
         0
     );
+
+  // ==========================================================
+  // MULTI-IMAGE HOVER GALLERY
+  // ==========================================================
+
+  const imageList = useMemo(() => {
+    const values = [
+      product?.image,
+      ...(Array.isArray(product?.images)
+        ? product.images
+        : []),
+    ].filter(Boolean);
+
+    return [...new Set(values)];
+  }, [product]);
+
+  const [imageIndex, setImageIndex] = useState(0);
+  const hoverTimerRef = useRef(null);
+
+  const clearImageTimer = () => {
+    if (hoverTimerRef.current) {
+      clearInterval(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  const handleImageMouseEnter = () => {
+    if (imageList.length <= 1) return;
+
+    clearImageTimer();
+
+    hoverTimerRef.current = setInterval(() => {
+      setImageIndex((current) =>
+        (current + 1) % imageList.length
+      );
+    }, 1500);
+  };
+
+  const handleImageMouseLeave = () => {
+    clearImageTimer();
+    setImageIndex(0);
+  };
+
+  useEffect(() => {
+    setImageIndex(0);
+    clearImageTimer();
+
+    return () => clearImageTimer();
+  }, [productId, imageList.length]);
+
+  const currentImage =
+    imageList[imageIndex] || product.image || "";
 
   // ==========================================================
   // CART
@@ -251,6 +310,8 @@ export default function ProductCard({
       <Link
         href={`/product/${productId}`}
         onClick={() => trackEvent("product_view", { productId, category: product.category, metadata: { source: "product_card" } })}
+        onMouseEnter={handleImageMouseEnter}
+        onMouseLeave={handleImageMouseLeave}
         style={{
           display:
             "block",
@@ -271,32 +332,75 @@ export default function ProductCard({
               "100%",
           }}
         >
-          <img
-            src={
-              product.image
-            }
-            alt={
-              product.name ||
-              "Product"
-            }
-            loading="lazy"
+          <div
             style={{
-              width:
-                "100%",
-              height:
-                "170px",
-              objectFit:
-                "contain",
-              padding:
-                "8px",
-              boxSizing:
-                "border-box",
-              background:
-                "rgba(255,255,255,0.04)",
-              borderRadius:
-                "12px",
+              position: "relative",
+              width: "100%",
+              height: "170px",
+              overflow: "hidden",
+              borderRadius: "12px",
+              background: "rgba(255,255,255,0.04)",
             }}
-          />
+            onMouseEnter={handleImageMouseEnter}
+            onMouseLeave={handleImageMouseLeave}
+          >
+            {imageList.map((image, index) => (
+              <img
+                key={`${productId}-image-${index}`}
+                src={image}
+                alt={product.name || "Product"}
+                loading={index === 0 ? "eager" : "lazy"}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  padding: "8px",
+                  boxSizing: "border-box",
+                  opacity: index === imageIndex ? 1 : 0,
+                  transform: index === imageIndex ? "scale(1)" : "scale(1.015)",
+                  transition: "opacity 0.7s ease-in-out, transform 0.7s ease-in-out",
+                  pointerEvents: "none",
+                  zIndex: index === imageIndex ? 2 : 1,
+                }}
+              />
+            ))}
+          </div>
+
+          {imageList.length > 1 && (
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: "8px",
+                transform: "translateX(-50%)",
+                display: "flex",
+                gap: "4px",
+                padding: "4px 6px",
+                borderRadius: "999px",
+                background: "rgba(0,0,0,0.32)",
+                backdropFilter: "blur(6px)",
+                zIndex: 4,
+              }}
+            >
+              {imageList.map((_, index) => (
+                <span
+                  key={index}
+                  style={{
+                    width: index === imageIndex ? "14px" : "5px",
+                    height: "5px",
+                    borderRadius: "999px",
+                    background: index === imageIndex
+                      ? "#ffffff"
+                      : "rgba(255,255,255,0.45)",
+                    transition: "width 0.2s ease",
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
           {/* STOCK */}
 

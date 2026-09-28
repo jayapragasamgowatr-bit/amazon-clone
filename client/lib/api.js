@@ -92,13 +92,18 @@ export const apiFetch = async (
     body !== undefined &&
     body !== null
   ) {
-    requestHeaders["Content-Type"] =
-      "application/json";
+    // Let the browser set the multipart boundary for FormData.
+    if (typeof FormData !== "undefined" && body instanceof FormData) {
+      requestBody = body;
+    } else {
+      requestHeaders["Content-Type"] =
+        "application/json";
 
-    requestBody =
-      typeof body === "string"
-        ? body
-        : JSON.stringify(body);
+      requestBody =
+        typeof body === "string"
+          ? body
+          : JSON.stringify(body);
+    }
   }
 
   // ==========================================================
