@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Sparkles, Send, Bot, User, ArrowRight, SlidersHorizontal, Gauge, Ruler, Wifi, Droplets } from "lucide-react";
+import { Sparkles, Send, Bot, User, ArrowRight, SlidersHorizontal, Gauge, Ruler, Wifi, Droplets, RefreshCw } from "lucide-react";
 import { askShoppingAssistant } from "../lib/api";
+import { getAssistantSuggestions } from "../lib/assistantSuggestions";
 
 const STARTERS = [
   "I need a flow meter for a 3-inch water pipeline.",
@@ -50,6 +51,59 @@ export default function Assistant() {
   const [error, setError] = useState("");
   const [messages, setMessages] = useState([]);
   const [lastProducts, setLastProducts] = useState([]);
+  const [suggestions, setSuggestions] = useState(STARTERS);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [seenSuggestions, setSeenSuggestions] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+
+    getAssistantSuggestions()
+      .then((data) => {
+        const next = Array.isArray(data?.suggestions)
+          ? data.suggestions.filter((item) => typeof item === "string" && item.trim()).slice(0, 4)
+          : [];
+
+        if (active && next.length) {
+          setSuggestions(next);
+          setSeenSuggestions(next);
+        }
+      })
+      .catch(() => {
+        // Keep the built-in starter questions if the suggestions API is unavailable.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const refreshSuggestions = async (context = "", extraExclude = []) => {
+    if (suggestionsLoading) return;
+    setSuggestionsLoading(true);
+
+    const exclude = [...new Set([
+      ...seenSuggestions,
+      ...suggestions,
+      ...extraExclude,
+    ].filter((item) => typeof item === "string" && item.trim()))].slice(-12);
+
+    try {
+      const data = await getAssistantSuggestions(exclude, context);
+      const next = Array.isArray(data?.suggestions)
+        ? data.suggestions.filter((item) => typeof item === "string" && item.trim()).slice(0, 4)
+        : [];
+
+      if (next.length) {
+        setSuggestions(next);
+        setSeenSuggestions((previous) => [...new Set([...previous, ...suggestions, ...extraExclude, ...next])].slice(-24));
+      }
+    } catch (_) {
+      // Keep the current questions if dynamic suggestions cannot be loaded.
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
 
   const canSend = useMemo(() => q.trim().length > 0 && !loading, [q, loading]);
 
@@ -73,6 +127,7 @@ export default function Assistant() {
         },
       ]);
       setLastProducts(Array.isArray(data?.products) ? data.products : []);
+      refreshSuggestions(clean, [clean]);
     } catch (err) {
       const message = err?.message || "Assistant request failed. Please try again.";
       setError(message);
@@ -116,10 +171,23 @@ export default function Assistant() {
         <div className="assistant-layout">
           <aside className="assistant-sidebar">
             <div className="assistant-side-card">
-              <div className="assistant-side-title"><SlidersHorizontal size={18} /> Try asking</div>
+              <div className="assistant-suggestions-heading">
+                <div className="assistant-side-title"><Sparkles size={18} /> Suggested questions</div>
+                <button
+                  type="button"
+                  className="assistant-suggestion-refresh"
+                  onClick={() => refreshSuggestions(messages.filter((item) => item.role === "user").slice(-1)[0]?.text || "")}
+                  disabled={suggestionsLoading || loading}
+                  aria-label="Refresh suggested questions"
+                  title="Refresh suggested questions"
+                >
+                  <RefreshCw size={15} className={suggestionsLoading ? "assistant-refresh-spin" : ""} />
+                  <span>{suggestionsLoading ? "Updating" : "Refresh"}</span>
+                </button>
+              </div>
               <div className="assistant-starters">
-                {STARTERS.map((starter) => (
-                  <button key={starter} type="button" onClick={() => ask(starter)} disabled={loading}>
+                {suggestions.map((starter, index) => (
+                  <button key={`${starter}-${index}`} type="button" onClick={() => ask(starter)} disabled={loading}>
                     {starter}
                   </button>
                 ))}

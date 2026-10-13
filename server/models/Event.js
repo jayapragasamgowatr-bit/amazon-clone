@@ -4,6 +4,7 @@ const EVENT_NAMES = [
   "page_view",
   "product_view",
   "search",
+  "assistant_query",
   "wishlist_add",
   "wishlist_remove",
   "cart_add",

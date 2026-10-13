@@ -1,0 +1,26 @@
+WAVENTRA VETRIC — DYNAMIC AI SUGGESTED QUESTIONS PATCH
+
+What this patch changes:
+- Connects the existing assistant suggestion controller to GET /api/ai/assistant/suggestions.
+- Shows catalogue/search-informed suggestions in the AI assistant UI.
+- Adds a refresh control and passes the latest customer intent to the suggestions endpoint.
+- Keeps static starter questions as a fallback if the endpoint/AI provider is unavailable.
+- Allows assistant_query events in the Event schema so assistant intent analytics can be recorded.
+- Adds tests for suggestion templates, exclusions, and route registration.
+
+Apply:
+1. Back up your current client and server folders.
+2. Extract this ZIP into D:\Waventravetric, keeping the client/ and server/ folder structure. Allow files to be overwritten.
+3. In PowerShell:
+   cd D:\Waventravetric\server
+   npm test
+   npm run check:syntax
+4. In another PowerShell session:
+   cd D:\Waventravetric\client
+   $env:NEXT_PUBLIC_API_URL="https://myshop-api-z6mr.onrender.com"
+   npm run build
+   Remove-Item Env:NEXT_PUBLIC_API_URL
+5. Review the output before committing or deploying.
+
+This patch intentionally does not include .env files, local environment files, node_modules, build output, or secrets.
+Do not use npm audit fix --force.

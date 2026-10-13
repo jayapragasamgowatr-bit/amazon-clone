@@ -1186,6 +1186,11 @@ textarea {
 .assistant-side-card { padding:20px; }
 .assistant-side-title { display:flex; align-items:center; gap:9px; font-size:15px; font-weight:850; }
 .assistant-side-note { color:rgba(226,232,240,.55); font-size:13px; line-height:1.55; }
+.assistant-suggestions-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.assistant-suggestion-refresh { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(103,232,249,.18); border-radius:10px; padding:7px 9px; background:rgba(15,35,54,.55); color:#a5f3fc; font-size:11px; font-weight:750; cursor:pointer; }
+.assistant-suggestion-refresh:disabled { opacity:.5; cursor:wait; }
+.assistant-refresh-spin { animation:assistant-refresh-spin .8s linear infinite; }
+@keyframes assistant-refresh-spin { to { transform:rotate(360deg); } }
 .assistant-starters { display:grid; gap:9px; margin-top:15px; }
 .assistant-starters button { text-align:left; padding:11px 12px; border-radius:13px; border:1px solid rgba(148,163,184,.12); background:rgba(15,35,54,.72); color:#dbeafe; cursor:pointer; line-height:1.4; transition:.2s ease; }
 .assistant-starters button:hover:not(:disabled) { border-color:rgba(103,232,249,.35); transform:translateY(-1px); background:rgba(18,52,75,.8); }

@@ -5,6 +5,7 @@ const EVENT_NAMES = [
   "page_view",
   "product_view",
   "search",
+  "assistant_query",
   "wishlist_add",
   "wishlist_remove",
   "cart_add",
@@ -15,7 +16,7 @@ const EVENT_NAMES = [
 ];
 
 test("event contract contains the core customer journey", () => {
-  for (const name of ["page_view", "product_view", "search", "cart_add", "checkout_started", "order_created"]) {
+  for (const name of ["page_view", "product_view", "search", "assistant_query", "cart_add", "checkout_started", "order_created"]) {
     assert.ok(EVENT_NAMES.includes(name));
   }
 });
