@@ -2,6 +2,9 @@ const crypto = require("crypto");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const AutomationAlert = require("../models/AutomationAlert");
+const PriceAlert = require("../models/PriceAlert");
+const User = require("../models/User");
+const { sendPriceDropAlertEmail } = require("../utils/emailService");
 const { getRiskAnalysis } = require("../controllers/riskController");
 
 const sha = (value) => crypto.createHash("sha256").update(String(value)).digest("hex");
@@ -18,6 +21,31 @@ async function runAutomationScan() {
   const now = new Date();
   const alerts = [];
   const threshold = Math.max(Number(process.env.AI_LOW_STOCK_THRESHOLD) || 5, 1);
+
+  // Price-drop alerts: notify once when a customer's target is reached.
+  const activePriceAlerts = await PriceAlert.find({ active: true })
+    .populate("product", "name price image images countInStock category isActive")
+    .lean();
+  for (const alert of activePriceAlerts) {
+    const product = alert.product;
+    if (!product || product.isActive === false) continue;
+    const currentPrice = Number(product.price || 0);
+    const targetPrice = Number(alert.targetPrice || 0);
+    if (currentPrice <= targetPrice && !alert.notifiedAt) {
+      const user = await User.findById(alert.user).select("name email").lean();
+      if (!user?.email) continue;
+      try {
+        await sendPriceDropAlertEmail({
+          user, product, oldPrice: Number(alert.createdPrice || currentPrice),
+          currentPrice, targetPrice,
+        });
+        await PriceAlert.updateOne({ _id: alert._id }, { $set: { notifiedAt: now, active: false } });
+        alerts.push({ created: true, alert: { type: "PRICE_DROP", user: alert.user, product: product._id } });
+      } catch (error) {
+        console.warn(`Price-drop email failed for ${product.name}:`, error.message);
+      }
+    }
+  }
 
   const products = await Product.find({ $or: [{ isActive: true }, { isActive: { $exists: false } }] })
     .select("name countInStock price category isActive")

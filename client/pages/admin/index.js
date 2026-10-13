@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import toast from "react-hot-toast";
 import {
   BarChart3,
   Boxes,
+  BrainCircuit,
   ChevronRight,
   CircleDollarSign,
   Clock3,
   Package,
   RefreshCw,
+  Search,
   ShoppingCart,
   TrendingUp,
   TriangleAlert,
@@ -17,7 +19,11 @@ import {
 } from "lucide-react";
 
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { getAdminAnalytics, getAllOrders } from "../../lib/api";
+import {
+  getAdminAnalytics,
+  getAllOrders,
+  getAiSearchIntelligence,
+} from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 
 const STATUS_ORDER = [
@@ -56,7 +62,7 @@ const formatDate = (value) => {
 
 const shortId = (id) => {
   const value = String(id || "");
-  return value ? `#${value.slice(-8).toUpperCase()}` : "—";
+  return value ? `#${value.slice(-8).toUpperCase()}` : "â€”";
 };
 
 export default function AdminDashboard() {
@@ -69,6 +75,9 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [range, setRange] = useState("30");
+  const [aiSearchData, setAiSearchData] = useState(null);
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [aiSearchError, setAiSearchError] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -97,10 +106,20 @@ export default function AdminDashboard() {
       const to = today.toISOString().slice(0, 10);
       const from = fromDate.toISOString().slice(0, 10);
 
-      const [analyticsData, ordersData] = await Promise.all([
-        getAdminAnalytics({ from, to }),
-        getAllOrders({ page: 1, limit: 6 }),
-      ]);
+      const [analyticsData, ordersData, aiData] =
+        await Promise.all([
+          getAdminAnalytics({ from, to }),
+          getAllOrders({ page: 1, limit: 6 }),
+          getAiSearchIntelligence(Number(range)).catch((aiError) => {
+            console.error("AI SEARCH INTELLIGENCE ERROR:", aiError);
+            setAiSearchError(
+              aiError?.message || "Unable to load AI search intelligence"
+            );
+            return null;
+          }),
+        ]);
+
+      setAiSearchData(aiData || null);
 
       setAnalytics(analyticsData || null);
 
@@ -174,6 +193,447 @@ export default function AdminDashboard() {
 
   const inventoryAlertCount = lowStockProducts.length;
 
+  const aiSummary = aiSearchData?.summary || aiSearchData?.metrics || {};
+  const aiTopQuestions = aiSearchData?.topQuestions || aiSearchData?.topQueries || [];
+  const aiTrending = aiSearchData?.trendingSearches || aiSearchData?.trending || [];
+  const aiIntents = aiSearchData?.intentCounts || aiSearchData?.intents || [];
+  const aiUnanswered =
+    aiSearchData?.unansweredDemand ||
+    aiSearchData?.unanswered ||
+    [];
+
+  const classifyDemand = (label) => {
+    const lower = String(label || "").toLowerCase().trim();
+
+    const companyPatterns = [
+      "who is waventra",
+      "what is waventra",
+      "what does waventra do",
+      "about waventra",
+      "about the company",
+      "company profile",
+      "company information",
+      "who are you",
+      "tell me about waventra",
+    ];
+
+    const budgetPatterns = [
+      "under â‚¹",
+      "under rs",
+      "under inr",
+      "budget",
+      "price",
+      "cost",
+      "cheap",
+      "affordable",
+      "lowest price",
+      "maximum price",
+      "below â‚¹",
+      "below rs",
+    ];
+
+    const connectivityPatterns = [
+      "rs485",
+      "modbus",
+      "wifi",
+      "wi-fi",
+      "gsm",
+      "4g",
+      "lorawan",
+      "lorawan",
+      "api",
+      "mqtt",
+      "communication",
+      "connect",
+      "connectivity",
+    ];
+
+    const specificationPatterns = [
+      "dn20",
+      "dn25",
+      "dn32",
+      "dn40",
+      "dn50",
+      "dn65",
+      "dn80",
+      "dn100",
+      "3 inch",
+      "3-inch",
+      "4 inch",
+      "4-inch",
+      "diameter",
+      "size",
+      "voltage",
+      "dc power",
+      "power supply",
+      "range",
+      "accuracy",
+      "pressure rating",
+      "specification",
+      "specifications",
+    ];
+
+    const productPatterns = [
+      "flow meter",
+      "flowmeter",
+      "water meter",
+      "ultrasonic",
+      "electromagnetic",
+      "emfm",
+      "level sensor",
+      "level monitoring",
+      "pressure sensor",
+      "hydrostatic",
+      "radar sensor",
+      "gateway",
+      "iot",
+      "transmission unit",
+      "controller",
+      "sensor",
+      "analyzer",
+      "ocems",
+    ];
+
+    const applicationPatterns = [
+      "tank",
+      "tank level",
+      "water pipeline",
+      "pipeline",
+      "water consumption",
+      "domestic water",
+      "industrial water",
+      "apartment",
+      "residential",
+      "building",
+      "campus",
+      "factory",
+      "plant",
+      "automation",
+      "monitoring",
+    ];
+
+    const technicalPatterns = [
+      "how does",
+      "how to",
+      "work with",
+      "works with",
+      "compatible",
+      "compatibility",
+      "accuracy",
+      "installation",
+      "calibration",
+      "maintenance",
+      "technical",
+      "working principle",
+      "principle",
+      "data transfer",
+      "data transmission",
+    ];
+
+    if (companyPatterns.some((p) => lower.includes(p))) {
+      return "company";
+    }
+
+    if (budgetPatterns.some((p) => lower.includes(p))) {
+      return "budget";
+    }
+
+    if (connectivityPatterns.some((p) => lower.includes(p))) {
+      return "connectivity";
+    }
+
+    if (specificationPatterns.some((p) => lower.includes(p))) {
+      return "specification";
+    }
+
+    if (
+      productPatterns.some((p) => lower.includes(p)) &&
+      applicationPatterns.some((p) => lower.includes(p))
+    ) {
+      return "product_application";
+    }
+
+    if (productPatterns.some((p) => lower.includes(p))) {
+      return "product";
+    }
+
+    if (applicationPatterns.some((p) => lower.includes(p))) {
+      return "application";
+    }
+
+    if (technicalPatterns.some((p) => lower.includes(p))) {
+      return "technical";
+    }
+
+    return "general";
+  };
+
+  const catalogueDemandRows = [
+    ...aiUnanswered,
+    ...aiTrending,
+    ...aiTopQuestions,
+  ]
+    .map((item, index) => {
+      const label =
+        typeof item === "string"
+          ? item
+          : item?.query ||
+            item?.question ||
+            item?.name ||
+            item?.label ||
+            "";
+
+      const text = String(label).trim();
+
+      if (!text) return null;
+
+      const intent = classifyDemand(text);
+
+      const specifications = [];
+      const applications = [];
+      const productSignals = [];
+
+      const lower = text.toLowerCase();
+
+      const specPatterns = [
+        ["dn100", "DN100 / 4-inch"],
+        ["4 inch", "4-inch"],
+        ["4-inch", "4-inch"],
+        ["3 inch", "3-inch"],
+        ["3-inch", "3-inch"],
+        ["dn80", "DN80"],
+        ["dn65", "DN65"],
+        ["dn50", "DN50"],
+        ["dn40", "DN40"],
+        ["dn32", "DN32"],
+        ["dn25", "DN25"],
+        ["dn20", "DN20"],
+        ["ultrasonic", "Ultrasonic"],
+        ["electromagnetic", "Electromagnetic"],
+        ["emfm", "EMFM"],
+        ["wifi", "Wi-Fi"],
+        ["gsm", "GSM"],
+        ["4g", "4G"],
+        ["lorawan", "LoRaWAN"],
+        ["modbus", "Modbus"],
+        ["rs485", "RS485"],
+      ];
+
+      specPatterns.forEach(([needle, value]) => {
+        if (lower.includes(needle) && !specifications.includes(value)) {
+          specifications.push(value);
+        }
+      });
+
+      const applicationPatterns = [
+        ["water pipeline", "Water pipeline"],
+        ["pipeline", "Pipeline monitoring"],
+        ["domestic", "Domestic water"],
+        ["industrial", "Industrial water"],
+        ["tank", "Tank monitoring"],
+        ["flow meter", "Flow measurement"],
+        ["flowmeter", "Flow measurement"],
+        ["water consumption", "Water consumption"],
+        ["building", "Building / campus"],
+        ["apartment", "Apartment / residential"],
+        ["factory", "Industrial / factory"],
+        ["automation", "Automation"],
+      ];
+
+      applicationPatterns.forEach(([needle, value]) => {
+        if (lower.includes(needle) && !applications.includes(value)) {
+          applications.push(value);
+        }
+      });
+
+      const productKeywords = [
+        "flow meter",
+        "flowmeter",
+        "ultrasonic",
+        "electromagnetic",
+        "emfm",
+        "water meter",
+        "level sensor",
+        "level monitoring",
+        "pressure sensor",
+        "gateway",
+        "transmission unit",
+        "iot",
+        "controller",
+        "sensor",
+        "analyzer",
+      ];
+
+      productKeywords.forEach((keyword) => {
+        if (lower.includes(keyword) && !productSignals.includes(keyword)) {
+          productSignals.push(keyword);
+        }
+      });
+
+      const count = Number(
+        item?.count ??
+          item?.searches ??
+          item?.frequency ??
+          item?.total ??
+          1
+      );
+
+      const growth = Number(
+        item?.growth ??
+          item?.growthRate ??
+          0
+      );
+
+      const isCatalogueDemand = [
+        "product",
+        "product_application",
+        "application",
+        "specification",
+        "connectivity",
+        "budget",
+      ].includes(intent);
+
+      const isTechnical = intent === "technical";
+
+      return {
+        label: text,
+        intent,
+        count: Number.isFinite(count) ? count : 1,
+        growth: Number.isFinite(growth) ? growth : 0,
+        specifications,
+        applications,
+        productSignals,
+        isCatalogueDemand,
+        isTechnical,
+        unanswered: aiUnanswered.some((u) => {
+          const uLabel =
+            typeof u === "string"
+              ? u
+              : u?.query ||
+                u?.question ||
+                u?.name ||
+                u?.label ||
+                "";
+
+          return String(uLabel).trim().toLowerCase() === lower;
+        }),
+        rank: index + 1,
+      };
+    })
+    .filter(Boolean);
+
+  const catalogueOnlyRows = catalogueDemandRows.filter(
+    (row) => row.isCatalogueDemand
+  );
+
+  const intentCounts = catalogueDemandRows.reduce((acc, row) => {
+    acc[row.intent] = (acc[row.intent] || 0) + row.count;
+    return acc;
+  }, {});
+
+  const catalogueGapMap = new Map();
+
+  catalogueOnlyRows.forEach((row) => {
+    const key =
+      row.productSignals[0] ||
+      row.specifications[0] ||
+      row.applications[0] ||
+      row.label;
+
+    const existing = catalogueGapMap.get(key);
+
+    if (!existing) {
+      catalogueGapMap.set(key, {
+        key,
+        label:
+          row.productSignals[0]
+            ? row.productSignals[0].replace(/\b\w/g, (m) => m.toUpperCase())
+            : row.specifications[0] ||
+              row.applications[0] ||
+              row.label,
+        demand: row.count,
+        growth: row.growth,
+        unanswered: row.unanswered ? 1 : 0,
+        intent: row.intent,
+        examples: [row.label],
+      });
+    } else {
+      existing.demand += row.count;
+      existing.growth = Math.max(existing.growth, row.growth);
+      existing.unanswered += row.unanswered ? 1 : 0;
+
+      if (
+        existing.examples.length < 3 &&
+        !existing.examples.includes(row.label)
+      ) {
+        existing.examples.push(row.label);
+      }
+    }
+  });
+
+  const catalogueGaps = Array.from(catalogueGapMap.values())
+    .sort(
+      (a, b) =>
+        (b.unanswered - a.unanswered) ||
+        (b.demand - a.demand) ||
+        (b.growth - a.growth)
+    )
+    .slice(0, 6);
+
+  const demandRecommendations = [];
+
+  catalogueGaps.slice(0, 4).forEach((gap) => {
+    if (gap.unanswered > 0) {
+      demandRecommendations.push(
+        `Review catalogue coverage for ${gap.label}. Customers are searching for it and at least one related query is currently unanswered.`
+      );
+    } else if (gap.demand >= 3 && gap.growth > 20) {
+      demandRecommendations.push(
+        `Consider improving product visibility and specifications for ${gap.label}; this has enough demand volume to be treated as a growing signal.`
+      );
+    } else {
+      demandRecommendations.push(
+        `Monitor ${gap.label} as a recurring customer demand signal and ensure relevant products have complete specifications.`
+      );
+    }
+  });
+
+  const demandSignalCount = catalogueOnlyRows.length;
+  const unansweredSignalCount = catalogueOnlyRows.filter(
+    (row) => row.unanswered
+  ).length;
+
+  const emergingSignalCount = catalogueOnlyRows.filter(
+    (row) => row.count < 3
+  ).length;
+
+  const excludedNonCatalogueCount = catalogueDemandRows.filter(
+    (row) => !row.isCatalogueDemand
+  ).length;
+
+  const intentLabels = {
+    product: "Product",
+    product_application: "Product + Application",
+    application: "Application",
+    specification: "Specification",
+    connectivity: "Connectivity",
+    budget: "Budget",
+    technical: "Technical",
+    company: "Company / General",
+    general: "General",
+  };
+
+  const aiDemandIntentRows = Object.entries(intentCounts)
+    .map(([intent, count]) => ({
+      intent,
+      label: intentLabels[intent] || intent,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  
+
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
@@ -182,7 +642,8 @@ export default function AdminDashboard() {
           <strong>Loading dashboard...</strong>
           <span>Preparing your business overview.</span>
 
-          <div style={{ marginTop: "20px" }}><Link href="/admin/event-analytics" style={{ fontWeight: 800 }}>Open Event Analytics →</Link></div>
+          <div style={{ marginTop: "20px" }}><Link href="/admin/event-analytics" style={{ fontWeight: 800 }}>Open Event Analytics â†’</Link></div>
+          <div style={{ marginTop: "10px" }}><Link href="/admin/ai-search-intelligence" style={{ fontWeight: 800 }}>Open AI Search Intelligence â†’</Link></div>
 
       <style jsx>{`
             .dashboard-loading {
@@ -221,7 +682,7 @@ export default function AdminDashboard() {
         <div className="dashboard-shell">
           <header className="dashboard-header">
             <div>
-              <div className="eyebrow">WAVENTRA VETRIC • ADMIN</div>
+              <div className="eyebrow">WAVENTRA VETRIC â€¢ ADMIN</div>
               <h1>Business Dashboard</h1>
               <p>
                 Monitor sales, orders, customers and inventory from one place.
@@ -300,7 +761,7 @@ export default function AdminDashboard() {
             <div className="panel sales-panel">
               <PanelHeader
                 title="Sales Performance"
-                subtitle={`Revenue • last ${range === "365" ? "12 months" : `${range} days`}`}
+                subtitle={`Revenue â€¢ last ${range === "365" ? "12 months" : `${range} days`}`}
                 icon={<BarChart3 size={19} />}
               />
 
@@ -333,7 +794,7 @@ export default function AdminDashboard() {
                             <div
                               className="bar"
                               style={{ height: `${height}%` }}
-                              title={`${formatDate(item.date)} — ${formatCurrency(revenue)}`}
+                              title={`${formatDate(item.date)} â€” ${formatCurrency(revenue)}`}
                             />
                             <span>
                               {new Date(`${item.date}T00:00:00`).toLocaleDateString(
@@ -525,7 +986,7 @@ export default function AdminDashboard() {
                                 {order?.user?.email ||
                                   order?.customer?.email ||
                                   order?.shippingAddress?.email ||
-                                  "—"}
+                                  "â€”"}
                               </span>
                             </div>
                           </td>
@@ -1298,6 +1759,716 @@ export default function AdminDashboard() {
             }
           }
 
+          /* ============================================================
+             AI SEARCH INTELLIGENCE - PREMIUM CARD UI
+             ============================================================ */
+
+          .ai-intelligence-panel {
+            width: 100%;
+            margin-top: 28px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-radius: 20px;
+            background:
+              linear-gradient(135deg, rgba(10, 20, 40, 0.96), rgba(8, 15, 31, 0.94));
+            box-shadow:
+              0 24px 70px rgba(0, 0, 0, 0.24),
+              inset 0 1px 0 rgba(255, 255, 255, 0.025);
+          }
+
+          .ai-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 22px 24px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.10);
+            background: linear-gradient(
+              90deg,
+              rgba(34, 211, 238, 0.035),
+              transparent 50%,
+              rgba(99, 102, 241, 0.035)
+            );
+          }
+
+          .ai-panel-title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+          }
+
+          .ai-brain-icon {
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 46px;
+            border: 1px solid rgba(103, 232, 249, 0.14);
+            border-radius: 13px;
+            background: linear-gradient(
+              135deg,
+              rgba(34, 211, 238, 0.14),
+              rgba(59, 130, 246, 0.08)
+            );
+            color: #67e8f9;
+            box-shadow: 0 10px 28px rgba(34, 211, 238, 0.08);
+          }
+
+          .ai-panel-title h2 {
+            margin: 0;
+            color: #f8fafc;
+            font-size: 18px;
+            line-height: 1.2;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+          }
+
+          .ai-panel-title p {
+            margin: 6px 0 0;
+            color: #7f8da5;
+            font-size: 11px;
+            line-height: 1.5;
+          }
+
+          .ai-refresh-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: 0 0 auto;
+            min-height: 40px;
+            padding: 0 15px;
+            border: 1px solid rgba(103, 232, 249, 0.18);
+            border-radius: 10px;
+            background: rgba(34, 211, 238, 0.07);
+            color: #a5f3fc;
+            font-size: 10px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.2s ease;
+          }
+
+          .ai-refresh-button:hover {
+            border-color: rgba(103, 232, 249, 0.35);
+            background: rgba(34, 211, 238, 0.12);
+            transform: translateY(-1px);
+          }
+
+          .ai-refresh-button:disabled {
+            opacity: 0.55;
+            cursor: wait;
+            transform: none;
+          }
+
+          .ai-error {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 16px 24px 0;
+            padding: 11px 13px;
+            border: 1px solid rgba(248, 113, 113, 0.18);
+            border-radius: 10px;
+            background: rgba(127, 29, 29, 0.13);
+            color: #fca5a5;
+            font-size: 10px;
+          }
+
+          .ai-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            padding: 20px 24px 0;
+          }
+
+          .ai-metric {
+            position: relative;
+            min-width: 0;
+            min-height: 142px;
+            padding: 17px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.10);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.028);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+            transition: 0.2s ease;
+          }
+
+          .ai-metric:hover {
+            border-color: rgba(103, 232, 249, 0.14);
+            background: rgba(255, 255, 255, 0.042);
+            transform: translateY(-1px);
+          }
+
+          .ai-metric::after {
+            content: "";
+            position: absolute;
+            right: -28px;
+            bottom: -35px;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: rgba(34, 211, 238, 0.035);
+            pointer-events: none;
+          }
+
+          .ai-metric-icon {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+          }
+
+          .ai-metric-icon.cyan {
+            background: rgba(34, 211, 238, 0.10);
+            color: #67e8f9;
+          }
+
+          .ai-metric-icon.purple {
+            background: rgba(139, 92, 246, 0.11);
+            color: #c4b5fd;
+          }
+
+          .ai-metric-icon.green {
+            background: rgba(34, 197, 94, 0.10);
+            color: #86efac;
+          }
+
+          .ai-metric-icon.blue {
+            background: rgba(59, 130, 246, 0.10);
+            color: #93c5fd;
+          }
+
+          .ai-metric-title {
+            display: block;
+            margin-top: 12px;
+            color: #94a3b8;
+            font-size: 10px;
+            line-height: 1.3;
+            font-weight: 800;
+          }
+
+          .ai-metric-value {
+            display: block;
+            margin-top: 5px;
+            color: #f8fafc;
+            font-size: 26px;
+            line-height: 1.05;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+          }
+
+          .ai-metric-subtitle {
+            display: block;
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 9px;
+            line-height: 1.4;
+          }
+
+          .ai-insight-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            padding: 14px 24px 24px;
+          }
+
+          .ai-insight-card {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.09);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.022);
+          }
+
+          .ai-insight-header {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-height: 68px;
+            padding: 13px 15px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.075);
+            background: rgba(255, 255, 255, 0.012);
+          }
+
+          .ai-insight-icon {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 34px;
+            border-radius: 9px;
+            background: rgba(14, 165, 233, 0.08);
+            color: #67e8f9;
+          }
+
+          .ai-insight-header h3 {
+            margin: 0;
+            color: #e2e8f0;
+            font-size: 11px;
+            line-height: 1.3;
+            font-weight: 900;
+          }
+
+          .ai-insight-header p {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: 9px;
+            line-height: 1.4;
+          }
+
+          .ai-list {
+            padding: 4px 0;
+          }
+
+          .ai-list-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 58px;
+            padding: 8px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.055);
+            transition: background 0.18s ease;
+          }
+
+          .ai-list-row:last-child {
+            border-bottom: 0;
+          }
+
+          .ai-list-row:hover {
+            background: rgba(255, 255, 255, 0.025);
+          }
+
+          .ai-list-row.warning .ai-rank {
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.08);
+          }
+
+          .ai-rank {
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 25px;
+            border-radius: 7px;
+            background: rgba(148, 163, 184, 0.07);
+            color: #94a3b8;
+            font-size: 9px;
+            font-weight: 900;
+          }
+
+          .ai-query {
+            min-width: 0;
+            flex: 1;
+          }
+
+          .ai-query strong {
+            display: block;
+            overflow: hidden;
+            color: #dbeafe;
+            font-size: 10px;
+            line-height: 1.4;
+            font-weight: 700;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .ai-query small {
+            display: block;
+            margin-top: 3px;
+            color: #64748b;
+            font-size: 8px;
+          }
+
+          .ai-value {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 0 0 auto;
+            color: #cbd5e1;
+            font-size: 9px;
+            font-weight: 800;
+          }
+
+          .ai-value small {
+            color: #4ade80;
+          }
+
+          .ai-empty {
+            min-height: 142px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+            color: #64748b;
+            font-size: 10px;
+            text-align: center;
+          }
+
+          .ai-empty svg {
+            color: #475569;
+          }
+
+          .ai-spin {
+            animation: ai-spin 0.8s linear infinite;
+          }
+
+          @keyframes ai-spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          @media (max-width: 1050px) {
+            .ai-kpi-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+
+          /* ============================================================
+             CATALOGUE DEMAND + GAP ANALYSIS
+             ============================================================ */
+
+          .catalogue-demand-panel {
+            margin-top: 18px;
+            overflow: hidden;
+            border: 1px solid rgba(148,163,184,.10);
+            border-radius: 18px;
+            background:
+              linear-gradient(
+                135deg,
+                rgba(8,20,38,.92),
+                rgba(8,15,31,.88)
+              );
+            box-shadow: 0 18px 55px rgba(0,0,0,.18);
+          }
+
+          .catalogue-demand-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 20px 22px;
+            border-bottom: 1px solid rgba(148,163,184,.08);
+          }
+
+          .catalogue-demand-eyebrow {
+            color: #67e8f9;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: .18em;
+          }
+
+          .catalogue-demand-header h2 {
+            margin: 5px 0 0;
+            color: #f8fafc;
+            font-size: 16px;
+            font-weight: 900;
+          }
+
+          .catalogue-demand-header p {
+            max-width: 650px;
+            margin: 5px 0 0;
+            color: #71809a;
+            font-size: 10px;
+            line-height: 1.5;
+          }
+
+          .catalogue-demand-badges {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+          }
+
+          .catalogue-demand-badges span {
+            padding: 6px 9px;
+            border: 1px solid rgba(103,232,249,.12);
+            border-radius: 999px;
+            background: rgba(34,211,238,.055);
+            color: #a5f3fc;
+            font-size: 8px;
+            font-weight: 800;
+            white-space: nowrap;
+          }
+
+          .catalogue-demand-badges .danger {
+            border-color: rgba(248,113,113,.14);
+            background: rgba(239,68,68,.055);
+            color: #fca5a5;
+          }
+
+          .catalogue-demand-grid {
+            display: grid;
+            grid-template-columns: repeat(2,minmax(0,1fr));
+            gap: 13px;
+            padding: 15px 22px;
+          }
+
+          .catalogue-demand-card {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid rgba(148,163,184,.08);
+            border-radius: 13px;
+            background: rgba(255,255,255,.018);
+          }
+
+          .catalogue-demand-card-head {
+            padding: 14px 15px;
+            border-bottom: 1px solid rgba(148,163,184,.065);
+          }
+
+          .catalogue-demand-card-head h3 {
+            margin: 0;
+            color: #e2e8f0;
+            font-size: 11px;
+            font-weight: 900;
+          }
+
+          .catalogue-demand-card-head p {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: 9px;
+          }
+
+          .catalogue-gap-list {
+            padding: 3px 0;
+          }
+
+          .catalogue-gap-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(148,163,184,.05);
+          }
+
+          .catalogue-gap-row:last-child {
+            border-bottom: 0;
+          }
+
+          .catalogue-gap-rank {
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 25px;
+            border-radius: 7px;
+            background: rgba(34,211,238,.07);
+            color: #67e8f9;
+            font-size: 9px;
+            font-weight: 900;
+          }
+
+          .catalogue-gap-main {
+            min-width: 0;
+            flex: 1;
+          }
+
+          .catalogue-gap-main strong {
+            display: block;
+            color: #dbeafe;
+            font-size: 10px;
+            line-height: 1.4;
+            font-weight: 800;
+          }
+
+          .catalogue-gap-meta {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+            margin-top: 5px;
+          }
+
+          .catalogue-gap-meta span {
+            color: #64748b;
+            font-size: 8px;
+          }
+
+          .catalogue-gap-meta .growth {
+            color: #4ade80;
+          }
+
+          .catalogue-gap-meta .unanswered {
+            color: #fca5a5;
+          }
+
+          .catalogue-gap-main small {
+            display: block;
+            overflow: hidden;
+            margin-top: 5px;
+            color: #53627b;
+            font-size: 8px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .catalogue-recommendations {
+            padding: 3px 0;
+          }
+
+          .catalogue-recommendation {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(148,163,184,.05);
+          }
+
+          .catalogue-recommendation:last-child {
+            border-bottom: 0;
+          }
+
+          .catalogue-recommendation-number {
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 25px;
+            border-radius: 7px;
+            background: rgba(139,92,246,.09);
+            color: #c4b5fd;
+            font-size: 9px;
+            font-weight: 900;
+          }
+
+          .catalogue-recommendation p {
+            margin: 1px 0 0;
+            color: #aebbd0;
+            font-size: 9px;
+            line-height: 1.55;
+          }
+
+          .catalogue-demand-empty {
+            min-height: 145px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #64748b;
+            font-size: 10px;
+            text-align: center;
+          }
+
+          .catalogue-demand-badges .emerging {
+            border-color: rgba(250,204,21,.14);
+            background: rgba(250,204,21,.05);
+            color: #fde68a;
+          }
+
+          .catalogue-gap-meta .emerging-text {
+            color: #fde68a;
+          }
+
+          .catalogue-intent-summary {
+            margin: 0 22px 14px;
+            padding: 13px 14px;
+            border: 1px solid rgba(148,163,184,.075);
+            border-radius: 12px;
+            background: rgba(255,255,255,.018);
+          }
+
+          .catalogue-intent-title {
+            color: #94a3b8;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+          }
+
+          .catalogue-intent-grid {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+            margin-top: 9px;
+          }
+
+          .catalogue-intent-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 9px;
+            border: 1px solid rgba(34,211,238,.09);
+            border-radius: 8px;
+            background: rgba(34,211,238,.035);
+          }
+
+          .catalogue-intent-chip span {
+            color: #94a3b8;
+            font-size: 8px;
+          }
+
+          .catalogue-intent-chip strong {
+            color: #67e8f9;
+            font-size: 9px;
+          }
+
+          .catalogue-intent-chip.muted {
+            border-color: rgba(148,163,184,.08);
+            background: rgba(148,163,184,.025);
+          }
+
+          .catalogue-intent-chip.muted strong {
+            color: #94a3b8;
+          }
+          .catalogue-demand-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 0 22px 20px;
+            padding: 10px 12px;
+            border: 1px solid rgba(250,204,21,.10);
+            border-radius: 9px;
+            background: rgba(250,204,21,.035);
+            color: #94a3b8;
+            font-size: 8px;
+            line-height: 1.5;
+          }
+
+          .catalogue-demand-note svg {
+            flex: 0 0 auto;
+            color: #facc15;
+          }
+          @media (max-width: 800px) {
+            .ai-panel-header {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+
+            .ai-refresh-button {
+              width: 100%;
+            }
+
+            .ai-insight-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+
+          @media (max-width: 560px) {
+            .ai-kpi-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .ai-panel-header,
+            .ai-kpi-grid,
+            .ai-insight-grid {
+              padding-left: 15px;
+              padding-right: 15px;
+            }
+
+            .ai-panel-title p {
+              max-width: 100%;
+            }
+          }
           @media (max-width: 800px) {
             .dashboard-page {
               padding: 24px 15px 60px;
@@ -1347,11 +2518,274 @@ export default function AdminDashboard() {
             }
           }
         `}</style>
-      </main>
+      
+      {/* AI SEARCH INTELLIGENCE */}
+<section className="ai-intelligence-panel">
+  <div className="ai-panel-header">
+    <div className="ai-panel-title">
+      <div className="ai-brain-icon"><BrainCircuit size={20} /></div>
+      <div>
+        <h2>AI Search Intelligence</h2>
+        <p>Understand what customers are searching for, what they want, and where your catalogue has gaps.</p>
+      </div>
+    </div>
+    <button
+      type="button"
+      className="ai-refresh-button"
+      onClick={async () => {
+        try {
+          setAiSearchLoading(true);
+          setAiSearchError("");
+          const data = await getAiSearchIntelligence(Number(range));
+          setAiSearchData(data || null);
+          toast.success("AI intelligence refreshed.");
+        } catch (err) {
+          console.error("AI SEARCH REFRESH ERROR:", err);
+          setAiSearchError(err?.message || "Unable to refresh AI intelligence");
+        } finally {
+          setAiSearchLoading(false);
+        }
+      }}
+      disabled={aiSearchLoading}
+    >
+      <RefreshCw size={15} className={aiSearchLoading ? "ai-spin" : ""} />
+      {aiSearchLoading ? "Analysing..." : "Refresh Intelligence"}
+    </button>
+  </div>
+
+  {aiSearchError && (
+    <div className="ai-error">
+      <TriangleAlert size={16} />
+      <span>{aiSearchError}</span>
+    </div>
+  )}
+
+  <div className="ai-kpi-grid">
+    <AiMetric title="AI Searches" value={aiSummary.totalSearches ?? aiSearchData?.totalSearches ?? 0} subtitle={`Last ${range} days`} icon={<Search size={18} />} accent="cyan" />
+    <AiMetric title="Unique Sessions" value={aiSummary.uniqueSessions ?? aiSearchData?.uniqueSessions ?? 0} subtitle="Customer search sessions" icon={<Users size={18} />} accent="purple" />
+    <AiMetric title="Matched Queries" value={aiSummary.matchedQueries ?? aiSearchData?.matchedQueries ?? 0} subtitle="Queries with useful results" icon={<Boxes size={18} />} accent="green" />
+    <AiMetric title="Match Rate" value={`${Number(aiSummary.matchRate ?? aiSearchData?.matchRate ?? 0).toFixed(1)}%`} subtitle="Catalogue coverage" icon={<TrendingUp size={18} />} accent="blue" />
+  </div>
+
+  <div className="ai-insight-grid">
+    <AiInsightList title="Top Customer Questions" subtitle="Most frequently searched requirements" icon={<Search size={16} />} items={aiTopQuestions} empty="No customer search questions yet." />
+    <AiInsightList title="Fastest Growing Searches" subtitle="Search demand gaining momentum" icon={<TrendingUp size={16} />} items={aiTrending} empty="No trending searches yet." />
+    <AiInsightList title="Customer Intent" subtitle="What customers are trying to accomplish" icon={<BrainCircuit size={16} />} items={aiIntents} empty="No intent signals yet." />
+    <AiInsightList title="Unanswered Demand" subtitle="Queries where catalogue coverage is weak" icon={<TriangleAlert size={16} />} items={aiUnanswered} empty="No unanswered demand detected." warning />
+  </div>
+</section>
+      
+{/* ============================================================
+          CATALOGUE DEMAND + GAP ANALYSIS
+          ============================================================ */}
+      <section className="catalogue-demand-panel">
+        <div className="catalogue-demand-header">
+          <div>
+            <div className="catalogue-demand-eyebrow">
+              BUSINESS INTELLIGENCE
+            </div>
+            <h2>Catalogue Demand & Gap Analysis</h2>
+            <p>
+              Turn real customer searches into product, specification and
+              catalogue improvement opportunities.
+            </p>
+          </div>
+
+          <div className="catalogue-demand-badges">
+            <span>
+              {demandSignalCount} catalogue signals
+            </span>
+            <span className="emerging">
+              {emergingSignalCount} emerging
+            </span>
+            <span className="danger">
+              {unansweredSignalCount} unanswered signals
+            </span>
+          </div>
+        </div>
+
+        <div className="catalogue-demand-grid">
+          <div className="catalogue-demand-card">
+            <div className="catalogue-demand-card-head">
+              <div>
+                <h3>Potential Catalogue Gaps</h3>
+                <p>
+                  Areas repeatedly requested by customers.
+                </p>
+              </div>
+            </div>
+
+            {catalogueGaps.length === 0 ? (
+              <div className="catalogue-demand-empty">
+                No meaningful catalogue gap signals yet.
+              </div>
+            ) : (
+              <div className="catalogue-gap-list">
+                {catalogueGaps.map((gap, index) => (
+                  <div
+                    className="catalogue-gap-row"
+                    key={`${gap.key}-${index}`}
+                  >
+                    <div className="catalogue-gap-rank">
+                      {index + 1}
+                    </div>
+
+                    <div className="catalogue-gap-main">
+                      <strong>{gap.label}</strong>
+
+                      <div className="catalogue-gap-meta">
+                        <span>
+                          Demand: {gap.demand}
+                        </span>
+
+                        {gap.demand >= 3 && gap.growth > 20 ? (
+                          <span className="growth">
+                            +{gap.growth}% growth
+                          </span>
+                        ) : gap.demand < 3 ? (
+                          <span className="emerging-text">
+                            Emerging signal
+                          </span>
+                        ) : null}
+
+                        {gap.unanswered > 0 && (
+                          <span className="unanswered">
+                            {gap.unanswered} unanswered
+                          </span>
+                        )}
+                      </div>
+
+                      {gap.examples?.length > 0 && (
+                        <small>
+                          Example: {gap.examples[0]}
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="catalogue-demand-card">
+            <div className="catalogue-demand-card-head">
+              <div>
+                <h3>Recommended Actions</h3>
+                <p>
+                  Practical next steps based on observed demand.
+                </p>
+              </div>
+            </div>
+
+            {demandRecommendations.length === 0 ? (
+              <div className="catalogue-demand-empty">
+                More customer search data is needed to generate reliable
+                recommendations.
+              </div>
+            ) : (
+              <div className="catalogue-recommendations">
+                {demandRecommendations.map((recommendation, index) => (
+                  <div
+                    className="catalogue-recommendation"
+                    key={`${recommendation}-${index}`}
+                  >
+                    <div className="catalogue-recommendation-number">
+                      {index + 1}
+                    </div>
+                    <p>{recommendation}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="catalogue-intent-summary">
+          <div className="catalogue-intent-title">
+            Search Intent Breakdown
+          </div>
+
+          <div className="catalogue-intent-grid">
+            {aiDemandIntentRows.map((row) => (
+              <div
+                className="catalogue-intent-chip"
+                key={row.intent}
+              >
+                <span>{row.label}</span>
+                <strong>{row.count}</strong>
+              </div>
+            ))}
+
+            {excludedNonCatalogueCount > 0 && (
+              <div className="catalogue-intent-chip muted">
+                <span>Non-catalogue / general</span>
+                <strong>{excludedNonCatalogueCount}</strong>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="catalogue-demand-note">
+          <TriangleAlert size={15} />
+          <span>
+            These are demand signals, not automatic product decisions.
+            Validate pricing, technical requirements, supplier availability,
+            and catalogue fit before adding products.
+          </span>
+        </div>
+      </section>
+</main>
     </ProtectedRoute>
   );
 }
 
+function AiMetric({ title, value, subtitle, icon, accent }) {
+  return (
+    <div className="ai-metric">
+      <div className={`ai-metric-icon ${accent}`}>{icon}</div>
+      <span className="ai-metric-title">{title}</span>
+      <strong className="ai-metric-value">{value}</strong>
+      <span className="ai-metric-subtitle">{subtitle}</span>
+    </div>
+  );
+}
+
+function AiInsightList({ title, subtitle, icon, items, empty, warning = false }) {
+  const normalizedItems = Array.isArray(items) ? items.slice(0, 6) : [];
+  return (
+    <div className="ai-insight-card">
+      <div className="ai-insight-header">
+        <div className="ai-insight-icon">{icon}</div>
+        <div><h3>{title}</h3><p>{subtitle}</p></div>
+      </div>
+      {normalizedItems.length === 0 ? (
+        <div className="ai-empty"><Search size={17} /><span>{empty}</span></div>
+      ) : (
+        <div className="ai-list">
+          {normalizedItems.map((item, index) => {
+            const label = typeof item === "string"
+              ? item
+              : item?.query || item?.question || item?.intent || item?.name || item?.label || "Unknown search";
+            const count = Number(item?.count ?? item?.searches ?? item?.frequency ?? item?.total ?? 0);
+            const growth = Number(item?.growth ?? item?.growthRate ?? 0);
+            return (
+              <div className={`ai-list-row ${warning ? "warning" : ""}`} key={`${label}-${index}`}>
+                <div className="ai-rank">{index + 1}</div>
+                <div className="ai-query">
+                  <strong>{label}</strong>
+                  {item?.category && <small>{item.category}</small>}
+                </div>
+                <div className="ai-value">
+                  {count > 0 && <span>{count}</span>}
+                  {growth > 0 && <small>+{growth}%</small>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 function KpiCard({ title, value, subtitle, icon, accent }) {
   return (
     <div className="kpi-card">
@@ -1476,3 +2910,7 @@ function EmptyMini({ icon, text }) {
     </div>
   );
 }
+
+
+
+

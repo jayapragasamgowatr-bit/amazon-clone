@@ -308,10 +308,17 @@ const resetPassword = async (req, res, next) => {
       });
     }
 
-    if (newPassword.length < 6 || newPassword.length > 128) {
+    if (newPassword.length < 8 || newPassword.length > 128) {
       return res.status(400).json({
         success: false,
-        message: "Password must be between 6 and 128 characters.",
+        message: "Password must be between 8 and 128 characters.",
+      });
+    }
+
+    if (!/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must contain at least one letter and one number.",
       });
     }
 

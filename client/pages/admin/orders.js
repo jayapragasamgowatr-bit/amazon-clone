@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 import {
@@ -156,6 +157,7 @@ export default function AdminOrders() {
       );
 
       let cancellationReason = "";
+      let shipment = {};
 
       if (newStatus === "Cancelled") {
         cancellationReason =
@@ -164,11 +166,37 @@ export default function AdminOrders() {
           ) || "";
       }
 
+      if (newStatus === "Shipped") {
+        const carrier =
+          window.prompt(
+            "Enter courier / carrier name (optional):"
+          ) || "";
+
+        const trackingNumber =
+          window.prompt(
+            "Enter tracking number (optional):"
+          ) || "";
+
+        const estimatedDelivery =
+          window.prompt(
+            "Enter estimated delivery date (YYYY-MM-DD, optional):"
+          ) || "";
+
+        shipment = {
+          carrier,
+          trackingNumber,
+          estimatedDeliveryAt: estimatedDelivery
+            ? `${estimatedDelivery}T23:59:59.999`
+            : null,
+        };
+      }
+
       const data =
         await updateOrderStatus(
           orderId,
           newStatus,
-          cancellationReason
+          cancellationReason,
+          shipment
         );
 
       console.log(
@@ -185,11 +213,12 @@ export default function AdminOrders() {
           if (id === orderId) {
             return {
               ...order,
+              ...(data?.order || {}),
               status: newStatus,
               deliveredAt:
                 newStatus === "Delivered"
-                  ? new Date().toISOString()
-                  : order.deliveredAt,
+                  ? data?.order?.deliveredAt || new Date().toISOString()
+                  : data?.order?.deliveredAt || order.deliveredAt,
             };
           }
 
@@ -219,11 +248,12 @@ export default function AdminOrders() {
 
         return {
           ...previous,
+          ...(data?.order || {}),
           status: newStatus,
           deliveredAt:
             newStatus === "Delivered"
-              ? new Date().toISOString()
-              : previous.deliveredAt,
+              ? data?.order?.deliveredAt || new Date().toISOString()
+              : data?.order?.deliveredAt || previous.deliveredAt,
         };
       });
     } catch (err) {
@@ -535,7 +565,7 @@ export default function AdminOrders() {
             </p>
           </div>
 
-          <button
+          <div style={{display:"flex",gap:"10px",alignItems:"center"}}><Link href="/admin/shipping" className="refresh-button" style={{textDecoration:"none"}}>Shipping Management</Link><button
             type="button"
             className="refresh-button"
             onClick={
@@ -548,7 +578,7 @@ export default function AdminOrders() {
             {refreshing
               ? "Refreshing..."
               : "Refresh"}
-          </button>
+          </button></div>
 
         </section>
 

@@ -13,6 +13,8 @@ const {
   getAllOrders,
   getOrderById,
   updateOrderStatus,
+  getAdminShippingOrders,
+  updateShippingDetails,
   deleteOrder,
   getAdminAnalytics,
   getAdvancedAnalytics,
@@ -90,6 +92,24 @@ router.get(
   adminOnly,
   getAdvancedAnalytics
 );
+
+// ============================================================
+// ADMIN SHIPPING MANAGEMENT
+// ============================================================
+router.get(
+  "/admin/shipping",
+  protect,
+  adminOnly,
+  getAdminShippingOrders
+);
+
+router.put(
+  "/admin/shipping/:id",
+  protect,
+  adminOnly,
+  updateShippingDetails
+);
+
 
 // ============================================================
 // GET SINGLE ORDER

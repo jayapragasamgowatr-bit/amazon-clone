@@ -7,6 +7,10 @@ const API_BASE_URL = (
   "http://localhost:5000"
 ).replace(/\/$/, "");
 
+if (process.env.NODE_ENV === "production" && /localhost|127\.0\.0\.1/i.test(API_BASE_URL)) {
+  console.error("PRODUCTION CONFIG ERROR: NEXT_PUBLIC_API_URL still points to localhost.");
+}
+
 // ============================================================
 // GET TOKEN
 // ============================================================
@@ -689,6 +693,27 @@ export const removeFromWishlist =
   };
 
 // ============================================================
+// PRICE-DROP ALERTS
+// ============================================================
+
+export const getPriceAlerts = async () =>
+  apiFetch("/api/price-alerts", { method: "GET", auth: true });
+
+export const createPriceAlert = async (productId, targetPrice) => {
+  if (!productId) throw new Error("Product ID is required");
+  return apiFetch("/api/price-alerts", {
+    method: "POST",
+    auth: true,
+    body: { productId, targetPrice: Number(targetPrice) },
+  });
+};
+
+export const deletePriceAlert = async (alertId) => {
+  if (!alertId) throw new Error("Price alert ID is required");
+  return apiFetch(`/api/price-alerts/${alertId}`, { method: "DELETE", auth: true });
+};
+
+// ============================================================
 // ORDERS
 // ============================================================
 
@@ -859,11 +884,25 @@ export const getOrderById =
 // PUT /api/orders/:id/status
 // ============================================================
 
+export const getAdminShippingOrders = async (status = "") => {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch(`/api/orders/admin/shipping${query}`, { auth: true });
+};
+
+export const updateShippingDetails = async (orderId, payload) => {
+  return apiFetch(`/api/orders/admin/shipping/${orderId}`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+};
+
 export const updateOrderStatus =
   async (
     orderId,
     status,
-    cancellationReason = ""
+    cancellationReason = "",
+    shipment = {}
   ) => {
     if (!orderId) {
       throw new Error(
@@ -906,6 +945,19 @@ export const updateOrderStatus =
     ) {
       body.cancellationReason =
         cancellationReason;
+    }
+
+    if (
+      status === "Shipped" &&
+      shipment &&
+      typeof shipment === "object"
+    ) {
+      body.shipment = {
+        carrier: String(shipment.carrier || "").trim(),
+        trackingNumber: String(shipment.trackingNumber || "").trim(),
+        estimatedDeliveryAt:
+          shipment.estimatedDeliveryAt || null,
+      };
     }
 
     return apiFetch(
@@ -1175,3 +1227,22 @@ export const runAutomationScan = async () => apiFetch("/api/automation/scan", {m
 export const resolveAutomationAlert = async (id) => apiFetch(`/api/automation/alerts/${encodeURIComponent(id)}/resolve`, {method:"PATCH", auth:true});
 
 export const askAISupport = async (message) => apiFetch("/api/support", { method: "POST", body: { message }, auth: true });
+
+// Admin AI Search Intelligence
+export const getAiSearchIntelligence = async (days = 30) => {
+  const value = Math.min(Math.max(Number(days) || 30, 1), 365);
+  return apiFetch(`/api/ai/admin/search-intelligence?days=${value}`, { auth: true });
+};
+
+
+
+// ============================================================
+// PHASE 14 ADVANCED EXPERIENCE PACK
+// ============================================================
+export const getCustomerDashboard2 = () => apiFetch("/api/advanced/dashboard", { auth:true });
+export const subscribeWebPush = (subscription) => apiFetch("/api/advanced/push/subscribe", { method:"POST", auth:true, body:{subscription} });
+export const unsubscribeWebPush = (endpoint) => apiFetch("/api/advanced/push/unsubscribe", { method:"POST", auth:true, body:{endpoint} });
+export const semanticProductSearch = (q) => apiFetch(`/api/advanced/semantic-search?q=${encodeURIComponent(q)}`);
+export const getProductKnowledgeGraph = () => apiFetch("/api/advanced/admin/knowledge-graph", { auth:true });
+export const getReviewAISummary = (productId) => apiFetch(`/api/advanced/admin/review-summary/${encodeURIComponent(productId)}`, { auth:true });
+export const getAdvancedAIDashboard = () => apiFetch("/api/advanced/admin/advanced-ai", { auth:true });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Sparkles, TrendingUp, ShoppingBag } from "lucide-react";
-import { getPersonalizedRecommendations, getTrendingRecommendations, logRecommendationEvent } from "../lib/api";
+import { getPersonalizedRecommendations, getTrendingRecommendations, getSimilarRecommendations, getFrequentlyBoughtRecommendations, logRecommendationEvent } from "../lib/api";
 
 const STORAGE_KEY = "wv_analytics_session";
 
@@ -14,7 +14,7 @@ export default function RecommendationSection({ type = "personalized", title, su
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const logged = useRef(false);
-  const source = productId ? "similar" : type;
+  const source = productId ? (type === "frequently_bought" ? "frequently_bought" : "similar") : type;
 
   useEffect(() => {
     let cancelled = false;
@@ -22,7 +22,9 @@ export default function RecommendationSection({ type = "personalized", title, su
       try {
         setLoading(true);
         const data = productId
-          ? await import("../lib/api").then((m) => m.getSimilarRecommendations(productId, { limit }))
+          ? type === "frequently_bought"
+            ? await getFrequentlyBoughtRecommendations(productId, { limit })
+            : await getSimilarRecommendations(productId, { limit })
           : type === "trending"
           ? await getTrendingRecommendations({ limit })
           : await getPersonalizedRecommendations({ limit, sessionId: getSessionId() });
@@ -43,7 +45,7 @@ export default function RecommendationSection({ type = "personalized", title, su
     });
   }, [products, source]);
 
-  const heading = useMemo(() => title || (productId ? "You May Also Like" : type === "trending" ? "Trending Products" : "Recommended for You"), [title, productId, type]);
+  const heading = useMemo(() => title || (productId ? (type === "frequently_bought" ? "Frequently Bought Together" : "You May Also Like") : type === "trending" ? "Trending Products" : "Recommended for You"), [title, productId, type]);
   if (!loading && products.length === 0) return null;
 
   return (
@@ -61,7 +63,7 @@ export default function RecommendationSection({ type = "personalized", title, su
         {loading ? Array.from({ length: Math.min(limit, 6) }).map((_, i) => <div key={i} className="recommendation-skeleton" />) : products.map((product, index) => (
           <Link key={product._id} href={`/product/${product._id}`} style={{ textDecoration: "none", color: "inherit" }} onClick={() => logRecommendationEvent({ source, productId: product._id, action: "click", sessionId: getSessionId(), position: index + 1 })}>
             <article className="recommendation-card">
-              <img src={product.image || ""} alt={product.name || "Product"} />
+              <img src={(Array.isArray(product.images) && product.images[0]) || product.image || ""} alt={product.name || "Product"} />
               <div className="recommendation-body">
                 <small>{product.category || "Product"}</small>
                 <h3>{product.name}</h3>

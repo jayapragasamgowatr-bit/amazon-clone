@@ -1,0 +1,36 @@
+WAVENTRA VETRIC — PHASE 15 PRODUCTION HARDENING
+
+This package contains the latest client + server with Phase 15 hardening.
+
+IMPORTANT:
+- .env and .env.local are intentionally NOT included.
+- Keep your current working secrets and copy them into the new folders.
+- Never put VAPID_PRIVATE_KEY, JWT_SECRET, MONGO_URI, AI keys, Cloudinary secrets or email API keys in the client.
+
+LOCAL REPLACEMENT
+1. Back up your current D:\Waventravetric\client and server folders.
+2. Replace client files with this package's client folder.
+3. Replace server files with this package's server folder.
+4. Restore your existing server .env.
+5. Restore your existing client .env.local and make sure it contains:
+   NEXT_PUBLIC_API_URL=http://localhost:5000
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY=<your public VAPID key>
+
+SERVER:
+  cd D:\Waventravetric\server
+  npm install
+  npm run check:production
+  npm run check:syntax
+  npm test
+  npm start
+
+CLIENT:
+  cd D:\Waventravetric\client
+  npm install
+  npm run build
+  npm start
+
+For development, use npm run dev in the client.
+
+See PHASE15_PRODUCTION_HARDENING.md for the complete production checklist.

@@ -1,0 +1,14 @@
+Waventra Vetric Wishlist — Exact Equal Image/Text Box Fix
+
+Replace:
+client/pages/wishlist.js
+
+This version uses:
+- Image box: exactly 249px high, full card width.
+- Image content: object-fit: cover, so every image fills the same 374:249-style box.
+- Text box: exactly 351px on desktop.
+- Outer card: exactly 630px including padding and gap.
+- Three equal desktop columns.
+- Price-drop API/backend untouched.
+
+Note: object-fit: cover can crop images with different aspect ratios. This is required if the actual visible image must fill the same 374:249 frame.

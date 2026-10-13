@@ -7,6 +7,9 @@ import {
   Check,
   Clock3,
   Home,
+  CalendarDays,
+  PackageCheck,
+  ExternalLink,
   Mail,
   MapPin,
   Package,
@@ -93,6 +96,41 @@ export default function OrderDetailsPage() {
       shipping: Number(order.shipping || 0),
       total: Number(order.totalPrice || 0),
     };
+  }, [order]);
+
+  const trackingHistory = useMemo(() => {
+    if (!order) return [];
+
+    if (Array.isArray(order.statusHistory) && order.statusHistory.length) {
+      return order.statusHistory;
+    }
+
+    // Older orders may not have milestone history. Do not invent timestamps
+    // for intermediate states; show only the known order timestamp.
+    return [
+      {
+        status: "Pending",
+        changedAt: order.createdAt,
+        note: "Order placed",
+      },
+    ];
+  }, [order]);
+
+  const estimatedDelivery = useMemo(() => {
+    const explicit = order?.shipment?.estimatedDeliveryAt;
+    if (explicit) return explicit;
+
+    if (order?.status === "Delivered" && order?.deliveredAt) {
+      return order.deliveredAt;
+    }
+
+    if (!order?.createdAt || order?.status === "Cancelled") return null;
+
+    const date = new Date(order.createdAt);
+    if (Number.isNaN(date.getTime())) return null;
+
+    date.setDate(date.getDate() + 5);
+    return date.toISOString();
   }, [order]);
 
   if (loading) {
@@ -227,8 +265,8 @@ export default function OrderDetailsPage() {
           <section className="tracking-card">
             <div className="section-heading">
               <div>
-                <strong>Order Tracking</strong>
-                <span>Live status from your order</span>
+                <strong>Advanced Order Tracking</strong>
+                <span>Live order milestones and shipment information</span>
               </div>
               <Truck size={20} />
             </div>
@@ -244,48 +282,138 @@ export default function OrderDetailsPage() {
                     {order.cancellationReason ||
                       "This order has been cancelled."}
                   </p>
+                  {order.cancelledAt && (
+                    <small>{dateTime(order.cancelledAt)}</small>
+                  )}
                 </div>
               </div>
             ) : (
-              <div className="tracking">
-                {STEPS.map((step, index) => {
-                  const active = currentIndex >= index;
-                  const current = currentIndex === index;
+              <>
+                <div className="tracking">
+                  {STEPS.map((step, index) => {
+                    const active = currentIndex >= index;
+                    const current = currentIndex === index;
 
-                  return (
-                    <div className="tracking-step" key={step}>
-                      <div
-                        className={`track-marker ${active ? "active" : ""} ${
-                          current ? "current" : ""
-                        }`}
-                      >
-                        {active ? <Check size={15} /> : index + 1}
-                      </div>
-
-                      <div className="track-copy">
-                        <strong>{step}</strong>
-                        <span>
-                          {step === "Pending" && "Order received"}
-                          {step === "Confirmed" && "Order confirmed"}
-                          {step === "Processing" && "Being prepared"}
-                          {step === "Shipped" && "On the way"}
-                          {step === "Delivered" && "Delivered to you"}
-                        </span>
-                      </div>
-
-                      {index < STEPS.length - 1 && (
+                    return (
+                      <div className="tracking-step" key={step}>
                         <div
-                          className={`track-line ${
-                            currentIndex > index ? "active" : ""
+                          className={`track-marker ${active ? "active" : ""} ${
+                            current ? "current" : ""
                           }`}
-                        />
-                      )}
+                        >
+                          {active ? <Check size={15} /> : index + 1}
+                        </div>
+
+                        <div className="track-copy">
+                          <strong>{step}</strong>
+                          <span>
+                            {step === "Pending" && "Order received"}
+                            {step === "Confirmed" && "Order confirmed"}
+                            {step === "Processing" && "Being prepared"}
+                            {step === "Shipped" && "On the way"}
+                            {step === "Delivered" && "Delivered to you"}
+                          </span>
+                        </div>
+
+                        {index < STEPS.length - 1 && (
+                          <div
+                            className={`track-line ${
+                              currentIndex > index ? "active" : ""
+                            }`}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="tracking-lower">
+                  <div className="milestones">
+                    <div className="mini-heading">
+                      <PackageCheck size={16} />
+                      <strong>Status history</strong>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {trackingHistory.map((entry, index) => (
+                      <div className="milestone" key={`${entry.status}-${index}`}>
+                        <div className="milestone-dot" />
+                        <div>
+                          <strong>{entry.status}</strong>
+                          <span>{entry.note || "Status updated"}</span>
+                          <small>{dateTime(entry.changedAt)}</small>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="shipment-box">
+                    <div className="mini-heading">
+                      <Truck size={16} />
+                      <strong>Shipment</strong>
+                    </div>
+
+                    {order.shipment?.shippingStatus && (
+                      <div className="shipment-notice">
+                        <span>Latest shipping update</span>
+                        <strong>{order.shipment.shippingStatus}</strong>
+                        {order.shipment.currentLocation && <small>{order.shipment.currentLocation}</small>}
+                      </div>
+                    )}
+
+                    {order.shipment?.carrier || order.shipment?.trackingNumber ? (
+                      <>
+                        <div className="shipment-row">
+                          <span>Carrier</span>
+                          <strong>{order.shipment?.carrier || "—"}</strong>
+                        </div>
+                        <div className="shipment-row">
+                          <span>Tracking number</span>
+                          <strong>{order.shipment?.trackingNumber || "—"}</strong>
+                        </div>
+                        {order.shipment?.shippedAt && (
+                          <div className="shipment-row">
+                            <span>Shipped</span>
+                            <strong>{dateTime(order.shipment.shippedAt)}</strong>
+                          </div>
+                        )}
+                        {order.shipment?.packageWeight && <div className="shipment-row"><span>Package weight</span><strong>{order.shipment.packageWeight}</strong></div>}
+                        {order.shipment?.notes && <div className="shipment-row"><span>Note</span><strong>{order.shipment.notes}</strong></div>}
+                        {order.shipment?.trackingUrl && <div className="shipment-link"><a href={order.shipment.trackingUrl} target="_blank" rel="noreferrer">Open courier tracking ↗</a></div>}
+                      </>
+                    ) : (
+                      <p className="shipment-muted">
+                        Tracking details will appear here once your order is shipped.
+                      </p>
+                    )}
+
+                    {estimatedDelivery && (
+                      <div className="eta">
+                        <CalendarDays size={15} />
+                        <div>
+                          <span>Estimated delivery</span>
+                          <strong>{dateTime(estimatedDelivery)}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </section>
+
+          {Array.isArray(order.shipmentUpdates) && order.shipmentUpdates.length > 0 && (
+            <section className="shipment-updates card">
+              <div className="section-heading"><div><strong>Shipping Notifications</strong><span>Latest courier updates</span></div><Truck size={19}/></div>
+              <div className="shipment-update-list">
+                {order.shipmentUpdates.slice(0, 10).map((update, index) => (
+                  <div className="shipment-update" key={`${update.updatedAt || index}-${index}`}>
+                    <div className="update-dot" />
+                    <div><strong>{update.status || "Shipment update"}</strong>{update.location && <span>{update.location}</span>}{update.note && <p>{update.note}</p>}<small>{dateTime(update.updatedAt)}</small></div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="content-grid">
             <section className="card items-card">
@@ -562,6 +690,74 @@ export default function OrderDetailsPage() {
           .track-line.active {
             background: linear-gradient(90deg,#22d3ee,#6366f1);
           }
+          .tracking-lower {
+            display: grid;
+            grid-template-columns: minmax(0,1.1fr) minmax(280px,.9fr);
+            gap: 14px;
+            padding: 0 20px 20px;
+          }
+          .milestones, .shipment-box {
+            border: 1px solid rgba(148,163,184,.09);
+            border-radius: 13px;
+            background: rgba(255,255,255,.025);
+            padding: 14px;
+          }
+          .mini-heading {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: #67e8f9;
+            font-size: 10px;
+            margin-bottom: 12px;
+          }
+          .mini-heading strong { color: #dce7f2; }
+          .milestone {
+            position: relative;
+            display: grid;
+            grid-template-columns: 10px minmax(0,1fr);
+            gap: 10px;
+            padding: 0 0 13px 1px;
+          }
+          .milestone:last-child { padding-bottom: 0; }
+          .milestone-dot {
+            width: 8px;
+            height: 8px;
+            margin-top: 4px;
+            border-radius: 50%;
+            background: #22d3ee;
+            box-shadow: 0 0 0 4px rgba(34,211,238,.08);
+          }
+          .milestone strong, .milestone span, .milestone small {
+            display: block;
+          }
+          .milestone strong { color: #e4edf6; font-size: 10px; }
+          .milestone span { margin-top: 2px; color: #73829a; font-size: 8px; }
+          .milestone small { margin-top: 3px; color: #53627a; font-size: 8px; }
+          .shipment-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(148,163,184,.06);
+            font-size: 9px;
+          }
+          .shipment-row span { color: #71809a; }
+          .shipment-row strong { color: #dce8f3; text-align: right; }
+          .shipment-muted { margin: 0; color: #687890; font-size: 9px; line-height: 1.5; }
+          .eta {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-top: 11px;
+            padding: 10px;
+            border: 1px solid rgba(34,211,238,.1);
+            border-radius: 10px;
+            background: rgba(34,211,238,.04);
+            color: #67e8f9;
+          }
+          .eta span, .eta strong { display: block; }
+          .eta span { color: #71809a; font-size: 8px; }
+          .eta strong { margin-top: 2px; color: #dceff7; font-size: 10px; }
           .cancelled {
             display: flex;
             align-items: center;
@@ -682,10 +878,12 @@ export default function OrderDetailsPage() {
           .help-card strong { color: #dceff7; font-size: 10px; }
           .help-card span { margin-top: 4px; color: #71839b; font-size: 9px; line-height: 1.4; }
           @keyframes spin { to { transform: rotate(360deg); } }
-          @media (max-width: 800px) {
+          .shipment-notice{margin-bottom:10px;padding:10px 12px;border:1px solid rgba(56,189,248,.16);background:rgba(14,165,233,.06);border-radius:9px}.shipment-notice span,.shipment-notice strong,.shipment-notice small{display:block}.shipment-notice span{font-size:9px;color:#71809a}.shipment-notice strong{color:#38bdf8;font-size:12px;margin-top:3px}.shipment-notice small{color:#9fb0c5;font-size:10px;margin-top:2px}.shipment-link a{color:#38bdf8;font-size:10px;text-decoration:none}.shipment-updates{margin-bottom:13px}.shipment-update-list{padding:5px 12px 12px}.shipment-update{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid rgba(148,163,184,.08)}.update-dot{width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-top:5px;flex:0 0 auto}.shipment-update strong,.shipment-update span,.shipment-update small{display:block}.shipment-update strong{color:#e5eef8;font-size:11px}.shipment-update span{color:#38bdf8;font-size:10px;margin-top:2px}.shipment-update p{margin:4px 0;color:#8392a8;font-size:10px}.shipment-update small{color:#65758d;font-size:9px;margin-top:3px}
+@media (max-width: 800px) {
             .page { padding: 24px 14px 60px; }
             .hero { align-items: flex-start; flex-direction: column; }
             .content-grid { grid-template-columns: 1fr; }
+            .tracking-lower { grid-template-columns: 1fr; padding: 0 12px 14px; }
             .tracking { padding: 20px 12px; }
             .track-copy span { display: none; }
           }

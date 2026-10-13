@@ -13,6 +13,7 @@ const EVENT_NAMES = [
   "order_created",
   "recommendation_impression",
   "recommendation_click",
+  "price_alert_created",
 ];
 
 const eventSchema = new mongoose.Schema(

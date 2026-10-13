@@ -4,6 +4,9 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
+const { securityHeaders } = require("./middlewares/securityMiddleware");
+const { validateEnvironment } = require("./utils/envValidation");
+
 const {
   createRateLimiter,
 } = require("./middlewares/rateLimitMiddleware");
@@ -16,6 +19,7 @@ const productRoutes = require("./routes/productRoutes");
 const authRoutes = require("./routes/authRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const wishlistRoutes = require("./routes/wishlistRoutes");
+const priceAlertRoutes = require("./routes/priceAlertRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const customerIntelligenceRoutes = require("./routes/customerIntelligenceRoutes");
@@ -25,12 +29,17 @@ const imageIntelligenceRoutes = require("./routes/imageIntelligenceRoutes");
 const authenticityRoutes = require("./routes/authenticityRoutes");
 const automationRoutes = require("./routes/automationRoutes");
 const supportRoutes = require("./routes/supportRoutes");
+const advancedFeatureRoutes = require("./routes/advancedFeatureRoutes");
 
 const {
   runAutomationScan,
 } = require("./services/automationService");
 
 const app = express();
+
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -62,42 +71,11 @@ if (allowedOrigins.includes("*")) {
 
 /*
 |--------------------------------------------------------------------------
-| Security Headers
+| Security Headers / Request IDs
 |--------------------------------------------------------------------------
 */
 
-app.disable("x-powered-by");
-
-app.use((req, res, next) => {
-  res.setHeader(
-    "X-Content-Type-Options",
-    "nosniff"
-  );
-
-  res.setHeader(
-    "X-Frame-Options",
-    "DENY"
-  );
-
-  res.setHeader(
-    "Referrer-Policy",
-    "strict-origin-when-cross-origin"
-  );
-
-  res.setHeader(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
-  );
-
-  if (process.env.NODE_ENV === "production") {
-    res.setHeader(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains"
-    );
-  }
-
-  next();
-});
+app.use(securityHeaders);
 
 
 /*
@@ -210,6 +188,7 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     console.log(
       `${new Date().toISOString()} ` +
+        `[${req.requestId || "no-request-id"}] ` +
         `${req.method} ` +
         `${req.originalUrl} ` +
         `${res.statusCode} ` +
@@ -274,6 +253,11 @@ app.use(
 );
 
 app.use(
+  "/api/price-alerts",
+  priceAlertRoutes
+);
+
+app.use(
   "/api/events",
   eventRoutes
 );
@@ -325,6 +309,8 @@ app.use(
 |--------------------------------------------------------------------------
 */
 
+app.use("/api/advanced", advancedFeatureRoutes);
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -343,7 +329,8 @@ app.use(
   (err, req, res, next) => {
     console.error(
       "SERVER ERROR:",
-      err
+      req.requestId || "no-request-id",
+      err?.message || err
     );
 
     if (err?.statusCode) {
@@ -423,6 +410,7 @@ app.use(
       .status(safeStatus)
       .json({
         success: false,
+        requestId: req.requestId,
 
         message:
           safeStatus === 500
@@ -462,27 +450,7 @@ const startServer = async () => {
     |--------------------------------------------------------------------------
     */
 
-    if (
-      process.env.NODE_ENV ===
-        "production" &&
-      !process.env.CLIENT_URL
-    ) {
-      throw new Error(
-        "CLIENT_URL is required in production"
-      );
-    }
-
-    if (!process.env.MONGO_URI) {
-      throw new Error(
-        "MONGO_URI is missing in .env"
-      );
-    }
-
-    if (!process.env.JWT_SECRET) {
-      throw new Error(
-        "JWT_SECRET is missing in .env"
-      );
-    }
+    validateEnvironment();
 
 
     /*
@@ -492,7 +460,11 @@ const startServer = async () => {
     */
 
     await mongoose.connect(
-      process.env.MONGO_URI
+      process.env.MONGO_URI,
+      {
+        serverSelectionTimeoutMS: 10000,
+        maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE) || 20,
+      }
     );
 
     console.log(

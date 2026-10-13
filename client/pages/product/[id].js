@@ -19,6 +19,9 @@ import toast from "react-hot-toast";
 import { apiFetch } from "../../lib/api";
 import useCartStore from "../../store/cartStore";
 import { useAuth } from "../../context/AuthContext";
+import { trackEvent } from "../../lib/eventTracker";
+import RecommendationSection from "../../components/RecommendationSection";
+import { saveRecentlyViewedProduct } from "../../components/RecentlyViewedSection";
 import { useWishlist } from "../../context/WishlistContext";
 
 function isValidObjectId(value) {
@@ -135,6 +138,13 @@ export default function ProductDetails() {
       }
 
       setProduct(productData);
+      saveRecentlyViewedProduct(productData);
+
+      trackEvent("product_view", {
+        productId: productData._id,
+        category: productData.category,
+        metadata: { source: "product_detail" },
+      });
 
       setSelectedImage(0);
       setQuantity(1);
@@ -293,6 +303,12 @@ export default function ProductDetails() {
         product._id
       );
 
+      trackEvent(wishlisted ? "wishlist_remove" : "wishlist_add", {
+        productId: product._id,
+        category: product.category,
+        metadata: { source: "product_detail" },
+      });
+
       toast.success(
         wishlisted
           ? "Removed from wishlist"
@@ -370,6 +386,12 @@ export default function ProductDetails() {
         product,
         quantity
       );
+
+      trackEvent("cart_add", {
+        productId: product._id,
+        category: product.category,
+        metadata: { quantity, source: "product_detail" },
+      });
 
       toast.success(
         `${quantity} ${
@@ -1259,6 +1281,24 @@ export default function ProductDetails() {
             </div>
           </Section>
         )}
+
+      {product?._id && (
+        <>
+          <RecommendationSection
+            productId={product._id}
+            title="AI Similar Products"
+            subtitle="Matched using product category, features, applications and technical specifications."
+            limit={6}
+          />
+          <RecommendationSection
+            productId={product._id}
+            type="frequently_bought"
+            title="Frequently Bought Together"
+            subtitle="Products commonly purchased with this product."
+            limit={6}
+          />
+        </>
+      )}
 
       <style jsx>{`
         .page {

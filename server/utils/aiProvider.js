@@ -13,7 +13,7 @@ const isConfigured = () => {
   return Boolean(c.apiKey && c.model);
 };
 
-const requestJson = async (url, options, timeoutMs = 30000) => {
+const requestJson = async (url, options, timeoutMs = 60000) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {

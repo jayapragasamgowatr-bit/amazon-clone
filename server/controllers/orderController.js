@@ -434,6 +434,14 @@ const createOrder = async (req, res) => {
 
               status: "Pending",
 
+              statusHistory: [
+                {
+                  status: "Pending",
+                  changedAt: new Date(),
+                  note: "Order placed successfully",
+                },
+              ],
+
               stockReserved: true,
 
               stockRestored: false,
@@ -1188,6 +1196,7 @@ const updateOrderStatus = async (
     const {
       status,
       cancellationReason = "",
+      shipment = {},
     } = req.body || {};
 
     if (
@@ -1211,6 +1220,34 @@ const updateOrderStatus = async (
         success: false,
         message:
           "Invalid order status",
+      });
+    }
+
+    const shipmentInput =
+      shipment && typeof shipment === "object"
+        ? shipment
+        : {};
+
+    const carrier = String(
+      shipmentInput.carrier || ""
+    ).trim().slice(0, 100);
+
+    const trackingNumber = String(
+      shipmentInput.trackingNumber || ""
+    ).trim().slice(0, 150);
+
+    const estimatedDeliveryAt =
+      shipmentInput.estimatedDeliveryAt
+        ? new Date(shipmentInput.estimatedDeliveryAt)
+        : null;
+
+    if (
+      estimatedDeliveryAt &&
+      Number.isNaN(estimatedDeliveryAt.getTime())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid estimated delivery date",
       });
     }
 
@@ -1356,6 +1393,17 @@ const updateOrderStatus = async (
                         0,
                         500
                       ),
+                },
+                $push: {
+                  statusHistory: {
+                    status: "Cancelled",
+                    changedAt: new Date(),
+                    note:
+                      String(cancellationReason || "")
+                        .trim()
+                        .slice(0, 300) ||
+                      "Order cancelled",
+                  },
                 },
               },
               {
@@ -1527,6 +1575,17 @@ const updateOrderStatus = async (
                         500
                       ),
                 },
+                $push: {
+                  statusHistory: {
+                    status: "Cancelled",
+                    changedAt: new Date(),
+                    note:
+                      String(cancellationReason || "")
+                        .trim()
+                        .slice(0, 300) ||
+                      "Order cancelled",
+                  },
+                },
               },
               {
                 returnDocument:
@@ -1582,6 +1641,13 @@ const updateOrderStatus = async (
                   stockReserved:
                     false,
                 },
+                $push: {
+                  statusHistory: {
+                    status: "Delivered",
+                    changedAt: new Date(),
+                    note: "Order delivered",
+                  },
+                },
               },
               {
                 returnDocument:
@@ -1624,6 +1690,24 @@ const updateOrderStatus = async (
             {
               $set: {
                 status,
+                ...(status === "Shipped"
+                  ? {
+                      "shipment.carrier": carrier,
+                      "shipment.trackingNumber": trackingNumber,
+                      "shipment.shippedAt": new Date(),
+                      "shipment.estimatedDeliveryAt": estimatedDeliveryAt,
+                    }
+                  : {}),
+              },
+              $push: {
+                statusHistory: {
+                  status,
+                  changedAt: new Date(),
+                  note:
+                    status === "Shipped"
+                      ? "Order shipped"
+                      : `Order moved to ${status}`,
+                },
               },
             },
             {
@@ -3194,12 +3278,105 @@ const deleteOrder = async (
   }
 };
 
+
+const parseShipmentDate = (value) => {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const d = new Date(`${text}T00:00:00.000Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(text);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const getAdminShippingOrders = async (req, res) => {
+  try {
+    const status = String(req.query?.status || "").trim();
+    const filter = status
+      ? { status }
+      : { status: { $in: ["Processing", "Shipped", "Delivered"] } };
+
+    const orders = await Order.find(filter)
+      .populate("user", "name email")
+      .populate("items.product", "name image")
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(200);
+
+    return res.status(200).json({ success: true, orders });
+  } catch (error) {
+    console.error("GET SHIPPING ORDERS ERROR:", error);
+    return res.status(500).json({ success: false, message: "Failed to load shipping orders" });
+  }
+};
+
+const updateShippingDetails = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
+
+    const body = req.body || {};
+    const estimatedDeliveryAt = body.estimatedDeliveryAt
+      ? parseShipmentDate(body.estimatedDeliveryAt)
+      : null;
+    if (body.estimatedDeliveryAt && !estimatedDeliveryAt) {
+      return res.status(400).json({ success: false, message: "Invalid estimated delivery date" });
+    }
+
+    const shipment = order.shipment || {};
+    shipment.carrier = String(body.carrier || "").trim().slice(0, 100);
+    shipment.trackingNumber = String(body.trackingNumber || "").trim().slice(0, 150);
+    shipment.trackingUrl = String(body.trackingUrl || "").trim().slice(0, 500);
+    shipment.currentLocation = String(body.currentLocation || "").trim().slice(0, 200);
+    shipment.packageWeight = String(body.packageWeight || "").trim().slice(0, 50);
+    shipment.shippingStatus = String(body.shippingStatus || shipment.shippingStatus || "Pending").trim().slice(0, 80);
+    shipment.notes = String(body.notes || "").trim().slice(0, 1000);
+    shipment.estimatedDeliveryAt = estimatedDeliveryAt;
+    shipment.shippedAt = shipment.shippedAt || (order.status === "Shipped" ? new Date() : null);
+    shipment.lastUpdatedAt = new Date();
+    order.shipment = shipment;
+
+    const update = {
+      status: shipment.shippingStatus || order.status,
+      location: shipment.currentLocation,
+      note: shipment.notes,
+      updatedAt: new Date(),
+    };
+    if (update.status || update.location || update.note) {
+      order.shipmentUpdates = [update, ...(order.shipmentUpdates || [])].slice(0, 50);
+    }
+
+    await order.save();
+
+    try {
+      const { sendPushToUser } = require("../utils/pushService");
+      await sendPushToUser(order.user, { title: "Shipping Update", body: `Order #${String(order._id).slice(-8).toUpperCase()} is ${order.shipment?.shippingStatus || order.status}.`, url: `/orders/${order._id}` });
+
+      const { sendShipmentUpdateEmail } = require("../utils/emailService");
+      await sendShipmentUpdateEmail(order);
+    } catch (emailError) {
+      console.error("SHIPMENT EMAIL FAILED:", emailError);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Shipping details updated and customer notification sent",
+      order,
+    });
+  } catch (error) {
+    console.error("UPDATE SHIPPING DETAILS ERROR:", error);
+    return res.status(500).json({ success: false, message: "Failed to update shipping details" });
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
   getAllOrders,
   getOrderById,
   updateOrderStatus,
+  getAdminShippingOrders,
+  updateShippingDetails,
   deleteOrder,
   getAdminAnalytics,
   getAdvancedAnalytics,

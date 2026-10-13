@@ -1,21 +1,14 @@
 node_modules/
 .next/
-out/
 .env
 .env.*
 !.env.example
+dist/
+coverage/
 *.log
-npm-debug.log*
-.DS_Store
 
-# Local backups and archives
+# Local backups and generated archives
+*.bak
+*.backup*
 *.zip
 *.rar
-*.7z
-*.backup
-
-# Local archives and backups
-*.zip
-*.rar
-*.7z
-*.backup

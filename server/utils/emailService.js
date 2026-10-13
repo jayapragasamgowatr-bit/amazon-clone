@@ -1040,6 +1040,23 @@ ${reason}
   };
 
 
+
+const sendShipmentUpdateEmail = async (order) => {
+  const email = String(order?.customer?.email || "").trim().toLowerCase();
+  if (!email) return null;
+  const shipment = order?.shipment || {};
+  const frontendUrl = String(process.env.CLIENT_URL || process.env.FRONTEND_URL || "").split(",")[0].trim().replace(/\/$/, "");
+  const trackingUrl = shipment.trackingUrl || (frontendUrl && order?._id ? `${frontendUrl}/orders/${order._id}` : "");
+  const customerName = escapeHtml(order?.customer?.name || "Customer");
+  const carrier = escapeHtml(shipment.carrier || "Not specified");
+  const tracking = escapeHtml(shipment.trackingNumber || "Not assigned");
+  const location = escapeHtml(shipment.currentLocation || "");
+  const status = escapeHtml(shipment.shippingStatus || order?.status || "Updated");
+  const eta = shipment.estimatedDeliveryAt ? new Date(shipment.estimatedDeliveryAt).toLocaleDateString("en-IN", {day:"2-digit", month:"short", year:"numeric"}) : "To be confirmed";
+  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f7fa;font-family:Arial,sans-serif"><div style="max-width:650px;margin:auto;background:#fff;padding:30px;border-radius:14px"><h1 style="color:#0284c7">Shipping Update</h1><p>Hello <strong>${customerName}</strong>,</p><p>Your order <strong>#${escapeHtml(order?._id || "")}</strong> has a shipping update.</p><p><strong>Status:</strong> ${status}</p><p><strong>Courier:</strong> ${carrier}<br><strong>Tracking:</strong> ${tracking}<br><strong>Estimated delivery:</strong> ${escapeHtml(eta)}${location ? `<br><strong>Current location:</strong> ${location}` : ""}</p>${trackingUrl ? `<p><a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 20px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">View Order Tracking</a></p>` : ""}<hr><p style="color:#777;font-size:12px">Waventra Vetric</p></div></body></html>`;
+  return sendEmail({ to: email, toName: order?.customer?.name || "Customer", subject: `Shipping Update - #${order?._id}`, html });
+};
+
 /*
 |--------------------------------------------------------------------------
 | EXPORTS
@@ -1109,11 +1126,53 @@ const sendPasswordResetEmail = async (user, rawToken) => {
   });
 };
 
+
+const sendPriceDropAlertEmail = async ({ user, product, oldPrice, currentPrice, targetPrice }) => {
+  const email = String(user?.email || "").trim().toLowerCase();
+  if (!email) throw new Error("User email is missing");
+
+  const frontendUrl = String(process.env.CLIENT_URL || process.env.FRONTEND_URL || "")
+    .split(",")[0].trim().replace(/\/$/, "");
+  const productUrl = frontendUrl && product?._id
+    ? `${frontendUrl}/product/${encodeURIComponent(product._id)}`
+    : "";
+  const name = escapeHtml(user?.name || "Customer");
+  const productName = escapeHtml(product?.name || "your wishlist product");
+  const oldValue = formatINR(oldPrice);
+  const currentValue = formatINR(currentPrice);
+  const targetValue = formatINR(targetPrice);
+
+  const html = `
+<!doctype html><html><body style="margin:0;padding:24px;background:#07111f;font-family:Arial,sans-serif;color:#e5e7eb;">
+<div style="max-width:650px;margin:auto;background:#0f172a;padding:32px;border-radius:18px;border:1px solid #1e293b;">
+<h1 style="color:#67e8f9;margin-top:0;">Price Drop Alert</h1>
+<p>Hello <strong>${name}</strong>,</p>
+<p><strong>${productName}</strong> is now available at a lower price.</p>
+<div style="padding:18px;background:#111827;border-radius:12px;margin:20px 0;">
+<p style="margin:0;color:#94a3b8;">Previous price</p><p style="font-size:24px;margin:6px 0;">${oldValue}</p>
+<p style="margin:12px 0 0;color:#94a3b8;">Current price</p><p style="font-size:30px;font-weight:800;color:#67e8f9;margin:6px 0;">${currentValue}</p>
+<p style="margin:12px 0 0;color:#94a3b8;">Your target</p><p style="font-size:18px;margin:6px 0;">${targetValue}</p>
+</div>
+${productUrl ? `<a href="${escapeHtml(productUrl)}" style="display:inline-block;padding:13px 20px;background:#06b6d4;color:#001018;text-decoration:none;border-radius:10px;font-weight:800;">View Product</a>` : ""}
+<p style="color:#64748b;font-size:12px;margin-top:26px;">Waventra Vetric</p>
+</div></body></html>`;
+
+  return sendEmail({
+    to: email,
+    toName: user?.name || "Customer",
+    subject: `Price dropped: ${product?.name || "Wishlist product"}`,
+    html,
+    text: `${product?.name || "Your wishlist product"} dropped from ${oldValue} to ${currentValue}. Your target was ${targetValue}.${productUrl ? ` View: ${productUrl}` : ""}`,
+  });
+};
+
 module.exports = {
+  sendShipmentUpdateEmail,
   verifyEmailConnection,
   sendEmail,
   sendOrderConfirmationEmail,
   sendAdminOrderNotification,
   sendOrderStatusEmail,
   sendPasswordResetEmail,
+  sendPriceDropAlertEmail,
 };

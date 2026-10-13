@@ -27,7 +27,15 @@ const getAssistant = async (req,res,next) => {
       user: `Customer request:\n${message}\n\nLive catalog from MongoDB:\n${JSON.stringify(catalog)}\n\nAnswer the customer. If there are no suitable products, explain that clearly and suggest a better search term.`,
       temperature:0.2,maxTokens:900
     });
-    if (req.user?._id) await Event.create({eventName:"search",sessionId:`assistant-${String(req.user._id)}`.slice(0,80),user:req.user._id,searchTerm:message.slice(0,100),metadata:{source:"ai_assistant"}}).catch(()=>{});
+    const sessionId = clean(req.body?.sessionId, 80) || (req.user?._id ? `assistant-${String(req.user._id)}` : `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`).slice(0, 80);
+    const intent = /flow|meter|dn\s*\d|pipe|pipeline|sensor|pressure|tds|ph|electromagnetic|ultrasonic/i.test(message) ? "technical"
+      : /tank|level|overhead|underground|motor|automation/i.test(message) ? "application"
+      : /iot|cloud|remote|wireless|connect/i.test(message) ? "connectivity"
+      : budget ? "budget"
+      : /show|find|recommend|product|buy|purchase|available/i.test(message) ? "shopping" : "general";
+    const category = products[0]?.category || "";
+    const budgetBucket = budget ? (budget <= 10000 ? "₹0–10K" : budget <= 25000 ? "₹10K–25K" : budget <= 50000 ? "₹25K–50K" : "₹50K+") : "";
+    await Event.create({eventName:"assistant_query",sessionId,user:req.user?._id||null,searchTerm:message.slice(0,100),category,path:"/assistant",metadata:{source:"ai_assistant",resultCount:products.length,intent,budgetBucket}}).catch(()=>{});
     res.json({success:true,provider:"ai",model:result.model,message:result.text,products});
   } catch(e){ next(e); }
 };

@@ -101,6 +101,17 @@ const userSchema = new mongoose.Schema(
         ref: "Product",
       },
     ],
+
+    pushSubscriptions: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+
+    notificationPreferences: {
+      orderUpdates: { type: Boolean, default: true },
+      priceDrops: { type: Boolean, default: true },
+      recommendations: { type: Boolean, default: true },
+    },
   },
 
   {

@@ -17,12 +17,14 @@ const productProjection = {
   description: 1,
   price: 1,
   image: 1,
+  images: 1,
   category: 1,
   countInStock: 1,
   rating: 1,
   numReviews: 1,
   features: 1,
   applications: 1,
+  specifications: 1,
 };
 
 const activeStockMatch = { isActive: { $ne: false }, countInStock: { $gt: 0 } };
@@ -122,12 +124,16 @@ const getSimilar = async (req, res, next) => {
     const source = await Product.findById(id, productProjection).lean();
     if (!source) return res.status(404).json({ success: false, message: "Product not found." });
 
-    const sourceTerms = new Set(`${source.name || ""} ${(source.features || []).join(" ")} ${(source.applications || []).join(" ")}`.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x.length >= 3));
-    const candidates = await Product.find({ ...activeStockMatch, _id: { $ne: id }, ...(source.category ? { category: source.category } : {}) }, productProjection).limit(100).lean();
+    const sourceText = `${source.name || ""} ${source.category || ""} ${(source.features || []).join(" ")} ${(source.applications || []).join(" ")} ${typeof source.specifications === "object" ? JSON.stringify(source.specifications) : source.specifications || ""}`.toLowerCase();
+    const sourceTerms = new Set(sourceText.split(/[^a-z0-9]+/).filter((x) => x.length >= 3));
+    const candidates = await Product.find({ ...activeStockMatch, _id: { $ne: id }, ...(source.category ? { category: source.category } : {}) }, productProjection).limit(150).lean();
     const ranked = candidates.map((p) => {
-      const terms = `${p.name || ""} ${(p.features || []).join(" ")} ${(p.applications || []).join(" ")}`.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x.length >= 3);
+      const text = `${p.name || ""} ${p.category || ""} ${(p.features || []).join(" ")} ${(p.applications || []).join(" ")} ${typeof p.specifications === "object" ? JSON.stringify(p.specifications) : p.specifications || ""}`.toLowerCase();
+      const terms = text.split(/[^a-z0-9]+/).filter((x) => x.length >= 3);
       const overlap = terms.reduce((n, t) => n + (sourceTerms.has(t) ? 1 : 0), 0);
-      return { ...p, score: overlap * 3 + Number(p.rating || 0) * 0.5 };
+      const categoryBoost = source.category && p.category === source.category ? 8 : 0;
+      const quality = Number(p.rating || 0) * 0.5 + Math.min(Number(p.numReviews || 0), 100) * 0.02;
+      return { ...p, score: Number((overlap * 3 + categoryBoost + quality).toFixed(3)) };
     }).sort((a, b) => b.score - a.score).slice(0, limit);
 
     res.json({ success: true, source: "similar", products: ranked });

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import ProductCard from "./ProductCard";
 import RecommendationSection from "./RecommendationSection";
+import RecentlyViewedSection from "./RecentlyViewedSection";
+import PersonalizedHomeSection from "./PersonalizedHomeSection";
 import { apiFetch } from "../lib/api";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
@@ -11,11 +13,35 @@ import {
   SlidersHorizontal,
   ArrowRight,
   MessageCircle,
+  Droplets,
+  Gauge,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Cpu,
+  ArrowUpRight,
 } from "lucide-react";
 
 export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
+
+  const heroImages = [
+    "https://images.unsplash.com/photo-1530053969600-caed2596d242?auto=format&fit=crop&w=1800&q=85",
+    "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1800&q=85",
+    "https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?auto=format&fit=crop&w=1800&q=85",
+    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=85",
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroImageIndex((current) => (current + 1) % heroImages.length);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -266,6 +292,87 @@ export default function HomePage() {
             "0 20px 60px rgba(0,0,0,0.25)",
         }}
       >
+        {/* Hero background slideshow */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden",
+            borderRadius: "30px",
+            zIndex: 0,
+          }}
+        >
+          {heroImages.map((image, index) => (
+            <motion.div
+              key={image}
+              initial={false}
+              animate={{
+                opacity: index === heroImageIndex ? 1 : 0,
+                scale: index === heroImageIndex ? 1.03 : 1.08,
+              }}
+              transition={{ duration: 1.4, ease: "easeInOut" }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage: `url(${image})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: "saturate(0.9)",
+              }}
+            />
+          ))}
+
+          {/* Dark blue overlay keeps the text highly readable */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(90deg, rgba(3,15,31,0.96) 0%, rgba(5,28,52,0.82) 45%, rgba(5,55,83,0.58) 100%)",
+            }}
+          />
+
+          {/* Bottom vignette */}
+          <div
+            style={{
+              position: "absolute",
+              inset: "auto 0 0",
+              height: "35%",
+              background:
+                "linear-gradient(transparent, rgba(2,12,26,0.55))",
+            }}
+          />
+        </div>
+
+        {/* Slideshow indicators */}
+        <div
+          style={{
+            position: "absolute",
+            right: "28px",
+            bottom: "24px",
+            display: "flex",
+            gap: "7px",
+            zIndex: 3,
+          }}
+        >
+          {heroImages.map((_, index) => (
+            <span
+              key={index}
+              style={{
+                width: index === heroImageIndex ? "28px" : "7px",
+                height: "7px",
+                borderRadius: "999px",
+                background:
+                  index === heroImageIndex
+                    ? "#67e8f9"
+                    : "rgba(255,255,255,0.42)",
+                transition: "all 0.4s ease",
+              }}
+            />
+          ))}
+        </div>
+
         <motion.div
           animate={{
             scale: [1, 1.15, 1],
@@ -425,6 +532,183 @@ export default function HomePage() {
           </div>
         </div>
       </motion.section>
+
+      {/* =================================================
+          BRAND STORY
+      ================================================= */}
+
+      <section style={{ marginBottom: "55px" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.55 }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0,1.05fr) minmax(0,0.95fr)",
+            gap: "22px",
+            alignItems: "stretch",
+          }}
+          className="home-story-grid"
+        >
+          <div
+            className="glass-card"
+            style={{
+              padding: "clamp(26px,4vw,46px)",
+              borderRadius: "26px",
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                width: "220px",
+                height: "220px",
+                borderRadius: "50%",
+                background: "rgba(14,165,233,0.10)",
+                right: "-100px",
+                top: "-90px",
+                filter: "blur(8px)",
+              }}
+            />
+            <span className="home-section-kicker">WHO WE ARE</span>
+            <h2 style={{ fontSize: "clamp(28px,4vw,42px)", lineHeight: 1.12, margin: "10px 0 16px", fontWeight: 900 }}>
+              Technology that makes water management smarter.
+            </h2>
+            <p style={{ fontSize: "17px", lineHeight: 1.8, opacity: 0.72, margin: 0 }}>
+              Waventra Vetric brings monitoring, measurement, connectivity and automation together in one modern ecosystem. We help organizations understand what is happening with their water systems so they can make clearer, data-driven decisions.
+            </p>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "24px" }}>
+              <span className="home-pill"><Droplets size={15} /> Water Intelligence</span>
+              <span className="home-pill"><Cpu size={15} /> Connected Technology</span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              minHeight: "360px",
+              borderRadius: "26px",
+              overflow: "hidden",
+              position: "relative",
+              backgroundImage: "linear-gradient(135deg, rgba(3,18,32,.20), rgba(3,105,161,.48)), url('https://images.unsplash.com/photo-1466611653911-95081537e5b7?auto=format&fit=crop&w=1400&q=85')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              boxShadow: "0 20px 55px rgba(0,0,0,.18)",
+            }}
+          >
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", padding: "24px" }}>
+              <div style={{ padding: "16px 18px", borderRadius: "18px", background: "rgba(2,12,24,.68)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,.12)", color: "#fff", maxWidth: "430px" }}>
+                <div style={{ fontWeight: 850, fontSize: "20px" }}>Measure. Connect. Understand.</div>
+                <div style={{ opacity: .72, marginTop: 6, lineHeight: 1.55 }}>Turning field data into useful information for better water operations.</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
+      <section style={{ marginBottom: "55px" }}>
+        <div style={{ textAlign: "center", maxWidth: "760px", margin: "0 auto 28px" }}>
+          <span className="home-section-kicker">WHAT WE DO</span>
+          <h2 style={{ fontSize: "clamp(28px,4vw,40px)", margin: "9px 0 10px", fontWeight: 900 }}>From measurement to intelligent action.</h2>
+          <p style={{ opacity: .68, lineHeight: 1.7, margin: 0 }}>Our solutions are designed to connect physical water infrastructure with reliable digital information.</p>
+        </div>
+
+        <div className="home-feature-grid">
+          {[
+            { icon: Gauge, title: "Monitor", text: "Track flow, level and water-related parameters with connected field devices." },
+            { icon: Radio, title: "Connect", text: "Transmit field data through IoT connectivity so information is available when it matters." },
+            { icon: Sparkles, title: "Understand", text: "Turn operational data into dashboards, trends and actionable insights." },
+            { icon: ShieldCheck, title: "Improve", text: "Use better visibility to support efficiency, control losses and improve operations." },
+          ].map(({ icon: Icon, title, text }) => (
+            <motion.div key={title} whileHover={{ y: -6 }} className="glass-card home-feature-card">
+              <div className="home-feature-icon"><Icon size={23} /></div>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      <motion.section
+        initial={{ opacity: 0, scale: .985 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true, amount: .2 }}
+        transition={{ duration: .55 }}
+        style={{
+          marginBottom: "55px",
+          borderRadius: "28px",
+          overflow: "hidden",
+          position: "relative",
+          minHeight: "330px",
+          backgroundImage: "linear-gradient(90deg, rgba(2,12,24,.96) 0%, rgba(2,18,35,.78) 48%, rgba(2,18,35,.22) 100%), url('https://images.unsplash.com/photo-1538300342682-cf57afb97285?auto=format&fit=crop&w=1600&q=85')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ padding: "clamp(28px,6vw,60px)", maxWidth: "760px", color: "#fff" }}>
+          <span className="home-section-kicker" style={{ color: "#67e8f9" }}>OUR VISION</span>
+          <h2 style={{ fontSize: "clamp(32px,5vw,52px)", lineHeight: 1.08, margin: "10px 0 16px", fontWeight: 900 }}>Making every choice smarter.</h2>
+          <p style={{ fontSize: "18px", lineHeight: 1.75, opacity: .78, margin: 0 }}>
+            We believe better visibility leads to better decisions. Our focus is to make water systems more measurable, connected and easier to manage through practical technology.
+          </p>
+        </div>
+      </motion.section>
+
+      <section style={{ marginBottom: "55px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,.9fr) minmax(0,1.1fr)", gap: "22px", alignItems: "center" }} className="home-objective-grid">
+          <div>
+            <span className="home-section-kicker">OUR CUSTOMER PROMISE</span>
+            <h2 style={{ fontSize: "clamp(28px,4vw,42px)", lineHeight: 1.12, margin: "9px 0 16px", fontWeight: 900 }}>Your needs come first.</h2>
+            <p style={{ opacity: .7, lineHeight: 1.8, fontSize: "17px" }}>
+              Our objective is to make every step clearer — from discovering the right solution to understanding its value and getting support after purchase.
+            </p>
+            <div style={{ display: "grid", gap: "12px", marginTop: "22px" }}>
+              {["Clear product information", "Technology-led discovery", "Simple buying experience", "Long-term customer support"].map((item, index) => (
+                <div key={item} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ width: "30px", height: "30px", borderRadius: "10px", display: "grid", placeItems: "center", background: "rgba(14,165,233,.12)", color: "#0284c7" }}>
+                    {index === 0 ? <Target size={16} /> : <ShieldCheck size={16} />}
+                  </div>
+                  <span style={{ fontWeight: 700 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            style={{
+              minHeight: "360px",
+              borderRadius: "26px",
+              overflow: "hidden",
+              backgroundImage: "linear-gradient(135deg, rgba(2,132,199,.08), rgba(2,12,24,.42)), url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=85')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              boxShadow: "0 20px 55px rgba(0,0,0,.15)",
+            }}
+          />
+        </div>
+      </section>
+
+      <section style={{ marginBottom: "55px", textAlign: "center" }}>
+        <span className="home-section-kicker">WHY WAVENTRA VETRIC</span>
+        <h2 style={{ fontSize: "clamp(28px,4vw,40px)", margin: "9px 0 10px", fontWeight: 900 }}>Built around useful technology.</h2>
+        <p style={{ maxWidth: "720px", margin: "0 auto 28px", opacity: .68, lineHeight: 1.7 }}>A modern experience where products, data and intelligent tools work together.</p>
+        <div className="home-trust-grid">
+          {[
+            ["01", "Practical", "Technology should solve real operational problems."],
+            ["02", "Connected", "Bring devices, data and people closer together."],
+            ["03", "Transparent", "Make product information and decisions easier to understand."],
+            ["04", "Future-ready", "Build an ecosystem that can grow with new technology."],
+          ].map(([num, title, text]) => (
+            <motion.div key={num} whileHover={{ y: -5 }} className="glass-card home-trust-card">
+              <span>{num}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
 
       {/* =================================================
           CATEGORIES
@@ -707,6 +991,12 @@ export default function HomePage() {
       </motion.div>
 
       {/* =================================================
+          PERSONALIZED HOMEPAGE
+      ================================================= */}
+
+      <PersonalizedHomeSection limit={6} />
+
+      {/* =================================================
           PRODUCTS
       ================================================= */}
 
@@ -863,16 +1153,13 @@ export default function HomePage() {
       </section>
 
       <RecommendationSection
-        type="personalized"
-        limit={6}
-      />
-
-      <RecommendationSection
         type="trending"
         title="Trending Right Now"
         subtitle="Popular products based on recent shopping activity."
         limit={6}
       />
+
+      <RecentlyViewedSection />
 
       {/* =================================================
           BOTTOM CTA
