@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === "production" && /localhost|127\.0\.0\.1/i.test(API_
 // GET TOKEN
 // ============================================================
 
-const REQUEST_TIMEOUT_MS = 20000;
+const REQUEST_TIMEOUT_MS = 60000;
 
 const getToken = () => {
   if (typeof window === "undefined") {
