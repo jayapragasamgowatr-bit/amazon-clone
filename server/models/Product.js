@@ -133,6 +133,14 @@ const productSchema = new mongoose.Schema(
 );
 
 // ============================================================
+// INDEXES (must be declared before the model is compiled)
+// ============================================================
+
+productSchema.index({ name: 1 });
+productSchema.index({ createdAt: -1 });
+productSchema.index({ isActive: 1, category: 1, price: 1 });
+
+// ============================================================
 // MODEL
 // ============================================================
 
@@ -144,6 +152,3 @@ const Product =
   );
 
 module.exports = Product;
-
-productSchema.index({ name: 1 });
-productSchema.index({ createdAt: -1 });

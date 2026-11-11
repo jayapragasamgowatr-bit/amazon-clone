@@ -1,9 +1,9 @@
 const express = require("express");
-const { protect, adminOnly } = require("../middlewares/authMiddleware");
+const { protect, can } = require("../middlewares/authMiddleware");
 const { createRateLimiter } = require("../middlewares/rateLimitMiddleware");
 const { listAlerts, scan, resolveAlert } = require("../controllers/automationController");
 const router = express.Router();
-router.use(protect, adminOnly);
+router.use(protect, can("analytics.view"));
 router.get("/alerts", listAlerts);
 router.post("/scan", createRateLimiter({windowMs:60000,max:10,message:"Too many automation scans."}), scan);
 router.patch("/alerts/:id/resolve", resolveAlert);

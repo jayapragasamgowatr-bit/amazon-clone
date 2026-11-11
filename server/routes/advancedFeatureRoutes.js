@@ -1,12 +1,12 @@
 const express=require("express");
-const {protect,adminOnly}=require("../middlewares/authMiddleware");
+const {protect,can}=require("../middlewares/authMiddleware");
 const c=require("../controllers/advancedFeatureController");
 const router=express.Router();
 router.get("/dashboard",protect,c.getCustomerDashboard);
 router.post("/push/subscribe",protect,c.savePushSubscription);
 router.post("/push/unsubscribe",protect,c.removePushSubscription);
 router.get("/semantic-search",c.semanticSearch);
-router.get("/admin/knowledge-graph",protect,adminOnly,c.getKnowledgeGraph);
-router.get("/admin/review-summary/:id",protect,adminOnly,c.summarizeProductReviews);
-router.get("/admin/advanced-ai",protect,adminOnly,c.getAdminAdvancedAI);
+router.get("/admin/knowledge-graph",protect,can("analytics.view"),c.getKnowledgeGraph);
+router.get("/admin/review-summary/:id",protect,can("analytics.view"),c.summarizeProductReviews);
+router.get("/admin/advanced-ai",protect,can("analytics.view"),c.getAdminAdvancedAI);
 module.exports=router;

@@ -1,3 +1,4 @@
+import { hasPermission } from "../../lib/permissions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
@@ -33,8 +34,8 @@ export default function AdminReviews() {
       router.replace("/login");
       return;
     }
-    if (user.isAdmin !== true && user.role !== "admin") {
-      toast.error("Admin access only");
+    if (!hasPermission(user, "products.manage")) {
+      toast.error("Your role does not have access to this page");
       router.replace("/");
     }
   }, [authLoading, user, router]);
@@ -167,7 +168,7 @@ export default function AdminReviews() {
 
   if (authLoading || loadingProducts) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute adminOnly>
         <div className="loading"><div className="loader" />Loading reviews...</div>
         <style jsx>{`.loading{min-height:70vh;display:flex;align-items:center;justify-content:center;gap:12px;color:#dbeafe;font-weight:800}.loader{width:34px;height:34px;border:4px solid rgba(56,189,248,.15);border-top-color:#38bdf8;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </ProtectedRoute>
@@ -175,7 +176,7 @@ export default function AdminReviews() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main className="page">
         <div className="shell">
           <header className="header">

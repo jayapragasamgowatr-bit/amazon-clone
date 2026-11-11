@@ -362,20 +362,20 @@ export default function CatalogueIntelligencePage() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute adminOnly>
         <div className="loading">Loading catalogue intelligence...</div>
-        <style jsx>{`.loading{min-height:70vh;display:grid;place-items:center;color:#a9b7cb;background:#07101f}`}</style>
+        <style jsx>{`.loading{min-height:70vh;display:grid;place-items:center;color:#a9b7cb;background:transparent}`}</style>
       </ProtectedRoute>
     );
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main className="page">
         <header className="header">
           <div>
             <Link href="/admin" className="back"><ArrowLeft size={15}/> Admin Dashboard</Link>
-            <div className="eyebrow"><BrainCircuit size={15}/> PHASE 12</div>
+            <div className="eyebrow"><BrainCircuit size={15}/> CATALOGUE INTELLIGENCE</div>
             <h1>AI Product Catalogue Intelligence</h1>
             <p>Match real customer requirements against the live product catalogue and expose missing or weak catalogue coverage.</p>
           </div>

@@ -24,7 +24,7 @@ export default function SalesChart({ data }) {
           marginBottom: "20px",
         }}
       >
-        Real Sales Analytics 📈
+        Sales analytics
       </h2>
 
       <div

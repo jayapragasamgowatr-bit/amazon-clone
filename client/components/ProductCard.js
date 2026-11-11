@@ -157,7 +157,7 @@ export default function ProductCard({
         trackEvent("cart_add", { productId, category: product.category, metadata: { quantity: 1, source: "product_card" } });
 
         toast.success(
-          "Added to cart 🛒"
+          "Added to cart"
         );
 
       } catch (error) {
@@ -197,7 +197,7 @@ export default function ProductCard({
         toast.success(
           wasWishlisted
             ? "Removed from wishlist"
-            : "Added to wishlist ❤️"
+            : "Added to wishlist"
         );
 
       } catch (error) {

@@ -1,7 +1,7 @@
 const express=require("express");
-const {protect,adminOnly}=require("../middlewares/authMiddleware");
+const {protect,can}=require("../middlewares/authMiddleware");
 const {getCustomerIntelligence,getCustomerIntelligenceSummary}=require("../controllers/customerIntelligenceController");
 const router=express.Router();
-router.get("/admin/summary",protect,adminOnly,getCustomerIntelligenceSummary);
-router.get("/admin/customer",protect,adminOnly,getCustomerIntelligence);
+router.get("/admin/summary",protect,can("analytics.view"),getCustomerIntelligenceSummary);
+router.get("/admin/customer",protect,can("analytics.view"),getCustomerIntelligence);
 module.exports=router;

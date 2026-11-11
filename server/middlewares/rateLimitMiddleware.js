@@ -5,9 +5,13 @@ const createRateLimiter = ({
   windowMs = 15 * 60 * 1000,
   max = 100,
   message = "Too many requests. Please try again later.",
+  // Optional: share one budget across several routes (e.g. all AI endpoints)
+  // instead of counting each path separately.
+  keyPrefix = "",
 } = {}) => {
   return (req, res, next) => {
-    const key = `${req.ip || "unknown"}:${req.baseUrl || ""}${req.path || ""}`;
+    const scope = keyPrefix || `${req.baseUrl || ""}${req.path || ""}`;
+    const key = `${req.ip || "unknown"}:${scope}`;
     const now = Date.now();
     const existing = buckets.get(key);
 

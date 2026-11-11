@@ -114,7 +114,14 @@ export const apiFetch = async (
   // AUTHORIZATION
   // ==========================================================
 
-  if (auth) {
+  // auth: "optional" sends the token when the visitor is signed in,
+  // and still lets guests through (used by the public AI tools).
+  if (auth === "optional") {
+    if (token) {
+      requestHeaders.Authorization =
+        `Bearer ${token}`;
+    }
+  } else if (auth) {
     if (!token) {
       console.error(
         "AUTH ERROR: Authentication required but no token exists."
@@ -224,10 +231,6 @@ export const apiFetch = async (
     response.status === 401 &&
     typeof window !== "undefined"
   ) {
-    console.error(
-      "401 UNAUTHORIZED:",
-      data
-    );
 
     // Remove invalid/expired token.
     localStorage.removeItem("token");
@@ -249,12 +252,15 @@ export const apiFetch = async (
       ) ||
       `API request failed: ${response.status}`;
 
-    console.error(
-      "API ERROR:",
-      response.status,
-      message,
-      url
-    );
+    // Expired sessions (401) are expected; only log real failures.
+    if (response.status !== 401) {
+      console.warn(
+        "API ERROR:",
+        response.status,
+        message,
+        normalizedEndpoint
+      );
+    }
 
     throw new Error(message);
   }
@@ -1173,7 +1179,7 @@ export const getDemandForecast = async (params = {}) => {
 // ============================================================
 export const getCustomerIntelligence = async (userId, days = 90) => apiFetch(`/api/customer-intelligence/admin/customer?userId=${encodeURIComponent(userId)}&days=${encodeURIComponent(days)}`, { auth:true });
 export const getCustomerIntelligenceSummary = async (days = 90) => apiFetch(`/api/customer-intelligence/admin/summary?days=${encodeURIComponent(days)}`, { auth:true });
-export const askShoppingAssistant = async (message) => apiFetch("/api/ai/assistant", { method:"POST", body:{message}, auth:false });
+export const askShoppingAssistant = async (message) => apiFetch("/api/ai/assistant", { method:"POST", body:{message}, auth:"optional" });
 export const getBusinessIntelligence = async (params = {}) => {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1226,7 +1232,7 @@ export const getAutomationAlerts = async (params = {}) => {
 export const runAutomationScan = async () => apiFetch("/api/automation/scan", {method:"POST", auth:true});
 export const resolveAutomationAlert = async (id) => apiFetch(`/api/automation/alerts/${encodeURIComponent(id)}/resolve`, {method:"PATCH", auth:true});
 
-export const askAISupport = async (message) => apiFetch("/api/support", { method: "POST", body: { message }, auth: true });
+export const askAISupport = async (message) => apiFetch("/api/support", { method: "POST", body: { message }, auth: "optional" });
 
 // Admin AI Search Intelligence
 export const getAiSearchIntelligence = async (days = 30) => {
@@ -1246,3 +1252,111 @@ export const semanticProductSearch = (q) => apiFetch(`/api/advanced/semantic-sea
 export const getProductKnowledgeGraph = () => apiFetch("/api/advanced/admin/knowledge-graph", { auth:true });
 export const getReviewAISummary = (productId) => apiFetch(`/api/advanced/admin/review-summary/${encodeURIComponent(productId)}`, { auth:true });
 export const getAdvancedAIDashboard = () => apiFetch("/api/advanced/admin/advanced-ai", { auth:true });
+
+// ============================================================
+// AI STUDIO: concierge chat, smart search, product Q&A,
+// review summaries, comparison and admin copywriting
+// ============================================================
+export const getAiStatus = () => apiFetch("/api/ai/status");
+
+export const sendAiChat = ({ message, history = [], productId = "", page = "", sessionId = "" }) =>
+  apiFetch("/api/ai/chat", {
+    method: "POST",
+    auth: "optional",
+    body: { message, history, productId, page, sessionId },
+  });
+
+export const smartProductSearch = (q) =>
+  apiFetch(`/api/ai/smart-search?q=${encodeURIComponent(q)}`, { auth: "optional" });
+
+export const getProductReviewSummary = (productId) =>
+  apiFetch(`/api/ai/products/${encodeURIComponent(productId)}/review-summary`);
+
+export const askAboutProduct = (productId, question) =>
+  apiFetch(`/api/ai/products/${encodeURIComponent(productId)}/ask`, {
+    method: "POST",
+    body: { question },
+  });
+
+export const compareProductsWithAI = (productIds, need = "") =>
+  apiFetch("/api/ai/compare", { method: "POST", body: { productIds, need } });
+
+export const generateProductCopy = (details) =>
+  apiFetch("/api/ai/admin/product-copy", { method: "POST", auth: true, body: details });
+
+// ============================================================
+// COUPONS
+// ============================================================
+export const validateCoupon = (code, subtotal) =>
+  apiFetch("/api/coupons/validate", { method: "POST", auth: true, body: { code, subtotal } });
+export const getCoupons = () => apiFetch("/api/coupons", { auth: true });
+export const createCoupon = (coupon) => apiFetch("/api/coupons", { method: "POST", auth: true, body: coupon });
+export const updateCoupon = (id, coupon) =>
+  apiFetch(`/api/coupons/${encodeURIComponent(id)}`, { method: "PUT", auth: true, body: coupon });
+export const deleteCoupon = (id) =>
+  apiFetch(`/api/coupons/${encodeURIComponent(id)}`, { method: "DELETE", auth: true });
+
+// ============================================================
+// ADDRESS BOOK
+// ============================================================
+export const getAddresses = () => apiFetch("/api/account/addresses", { auth: true });
+export const addAddress = (address) =>
+  apiFetch("/api/account/addresses", { method: "POST", auth: true, body: address });
+export const updateAddress = (id, address) =>
+  apiFetch(`/api/account/addresses/${encodeURIComponent(id)}`, { method: "PUT", auth: true, body: address });
+export const deleteAddress = (id) =>
+  apiFetch(`/api/account/addresses/${encodeURIComponent(id)}`, { method: "DELETE", auth: true });
+
+// ============================================================
+// CANCEL / RETURN
+// ============================================================
+export const cancelMyOrder = (id, reason = "") =>
+  apiFetch(`/api/orders/${encodeURIComponent(id)}/cancel`, { method: "POST", auth: true, body: { reason } });
+export const requestOrderReturn = (id, reason, details = "") =>
+  apiFetch(`/api/orders/${encodeURIComponent(id)}/return`, { method: "POST", auth: true, body: { reason, details } });
+export const getReturnPolicy = () => apiFetch("/api/orders/meta/return-policy");
+export const getAdminReturns = (status = "") =>
+  apiFetch(`/api/orders/admin/returns${status ? `?status=${encodeURIComponent(status)}` : ""}`, { auth: true });
+export const decideReturn = (id, decision, note = "") =>
+  apiFetch(`/api/orders/admin/returns/${encodeURIComponent(id)}`, { method: "PUT", auth: true, body: { decision, note } });
+
+// ============================================================
+// STAFF ROLES, SUSPENSION, ACTIVITY LOG
+// ============================================================
+export const getStaff = () => apiFetch("/api/admin/staff", { auth: true });
+export const setUserRole = (id, role) =>
+  apiFetch(`/api/admin/users/${encodeURIComponent(id)}/role`, { method: "PUT", auth: true, body: { role } });
+export const setUserBlocked = (id, blocked, reason = "") =>
+  apiFetch(`/api/admin/users/${encodeURIComponent(id)}/block`, { method: "PUT", auth: true, body: { blocked, reason } });
+export const getAdminActivity = (params = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+  });
+  return apiFetch(`/api/admin/activity${query.toString() ? `?${query}` : ""}`, { auth: true });
+};
+
+// ============================================================
+// PROFILE AND PASSWORD
+// ============================================================
+export const updateMyProfile = (profile) =>
+  apiFetch("/api/account/profile", { method: "PUT", auth: true, body: profile });
+export const changeMyPassword = (currentPassword, newPassword) =>
+  apiFetch("/api/account/password", { method: "PUT", auth: true, body: { currentPassword, newPassword } });
+
+// ============================================================
+// PRODUCT QUESTIONS AND ANSWERS
+// ============================================================
+export const getProductQuestions = (productId) =>
+  apiFetch(`/api/questions/product/${encodeURIComponent(productId)}`, { auth: "optional" });
+export const askProductQuestion = (productId, question) =>
+  apiFetch(`/api/questions/product/${encodeURIComponent(productId)}`, { method: "POST", auth: true, body: { question } });
+export const getAdminQuestions = (status = "Pending") =>
+  apiFetch(`/api/questions/admin?status=${encodeURIComponent(status)}`, { auth: true });
+export const answerProductQuestion = (id, answer) =>
+  apiFetch(`/api/questions/admin/${encodeURIComponent(id)}`, { method: "PUT", auth: true, body: { answer } });
+export const setQuestionHidden = (id, hidden) =>
+  apiFetch(`/api/questions/admin/${encodeURIComponent(id)}`, { method: "PUT", auth: true, body: { hidden } });
+export const deleteProductQuestion = (id) =>
+  apiFetch(`/api/questions/admin/${encodeURIComponent(id)}`, { method: "DELETE", auth: true });
+

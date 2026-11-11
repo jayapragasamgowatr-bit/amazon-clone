@@ -128,7 +128,7 @@ export default function AdminShippingPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main className="shipping-page">
         <header>
           <div>

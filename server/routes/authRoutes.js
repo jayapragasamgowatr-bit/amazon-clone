@@ -26,7 +26,9 @@ const {
 const {
   protect,
   adminOnly,
+  can,
 } = require("../middlewares/authMiddleware");
+const { audit } = require("../middlewares/auditMiddleware");
 
 // ============================================================
 // PUBLIC
@@ -72,14 +74,14 @@ router.get(
 router.get(
   "/users",
   protect,
-  adminOnly,
+  can("customers.view"),
   getUsers
 );
 
 router.get(
   "/users/:id",
   protect,
-  adminOnly,
+  can("customers.view"),
   getUserById
 );
 
@@ -87,6 +89,7 @@ router.put(
   "/users/:id",
   protect,
   adminOnly,
+  audit("user.update", "User"),
   updateUser
 );
 
@@ -94,6 +97,7 @@ router.put(
   "/users/:id/role",
   protect,
   adminOnly,
+  audit("user.role", "User"),
   updateUserRole
 );
 
@@ -101,6 +105,7 @@ router.delete(
   "/users/:id",
   protect,
   adminOnly,
+  audit("user.delete", "User"),
   deleteUser
 );
 

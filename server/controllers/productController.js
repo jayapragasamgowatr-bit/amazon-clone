@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const { hasPermission } = require("../utils/permissions");
 const Order = require("../models/Order");
 const InventoryTransaction = require("../models/InventoryTransaction");
 const { validateSpecifications, validateStringArray, validateReview } = require("../utils/validation");
@@ -1195,7 +1196,7 @@ const updateProductReview = async (
     }
 
     const isOwner = review.user.toString() === req.user._id.toString();
-    const isAdmin = req.user?.role === "admin";
+    const isAdmin = hasPermission(req.user?.role, "products.manage");
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({
@@ -1320,7 +1321,7 @@ const deleteProductReview = async (
     }
 
     const isOwner = review.user.toString() === req.user._id.toString();
-    const isAdmin = req.user?.role === "admin";
+    const isAdmin = hasPermission(req.user?.role, "products.manage");
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({

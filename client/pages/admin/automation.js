@@ -85,7 +85,7 @@ export default function AutomationPage() {
 }
 
 const styles = {
-  page: { minHeight: "100vh", padding: "32px", background: "#071126", color: "#eef4ff", fontFamily: "Inter,Arial,sans-serif" },
+  page: { minHeight: "100vh", padding: "32px", background: "transparent", color: "#eef4ff", fontFamily: "Inter,Arial,sans-serif" },
   header: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", flexWrap: "wrap", marginBottom: 24 },
   actions: { display: "flex", gap: 10, flexWrap: "wrap" },
   select: { padding: "11px 14px", borderRadius: 10, background: "#101d38", color: "white", border: "1px solid #2a3d63" },

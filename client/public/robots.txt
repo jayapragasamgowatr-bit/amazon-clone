@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
-
-Sitemap: https://your-domain.com/sitemap.xml
+Disallow: /account
+Disallow: /orders
+Disallow: /checkout

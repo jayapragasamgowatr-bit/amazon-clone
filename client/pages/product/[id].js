@@ -21,6 +21,8 @@ import useCartStore from "../../store/cartStore";
 import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../lib/eventTracker";
 import RecommendationSection from "../../components/RecommendationSection";
+import ProductAIPanel from "../../components/ProductAIPanel";
+import ProductQuestions from "../../components/ProductQuestions";
 import { saveRecentlyViewedProduct } from "../../components/RecentlyViewedSection";
 import { useWishlist } from "../../context/WishlistContext";
 
@@ -312,7 +314,7 @@ export default function ProductDetails() {
       toast.success(
         wishlisted
           ? "Removed from wishlist"
-          : "Added to wishlist ❤️"
+          : "Added to wishlist"
       );
     } catch (error) {
       console.error(
@@ -1101,6 +1103,14 @@ export default function ProductDetails() {
           )}
         </div>
       </Section>
+
+      {/* AI TOOLS: compare, ask about this product, review summary */}
+
+      <ProductAIPanel product={product} />
+
+      {/* QUESTIONS AND ANSWERS (answered by staff) */}
+
+      <ProductQuestions productId={product._id} />
 
       {/* REVIEWS */}
 

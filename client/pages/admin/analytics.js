@@ -71,7 +71,7 @@ export default function AdvancedAnalytics() {
   }, [summary, inventory, customerSummary]);
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main className="page">
         <div className="shell">
           <header className="header">

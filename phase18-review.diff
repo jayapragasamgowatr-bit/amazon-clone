@@ -1,0 +1,760 @@
+﻿diff --git a/client/pages/admin/automation.js b/client/pages/admin/automation.js
+index 68a29c6..6a4aa00 100644
+--- a/client/pages/admin/automation.js
++++ b/client/pages/admin/automation.js
+@@ -2,12 +2,104 @@ import { useEffect, useState } from "react";
+ import Head from "next/head";
+ import { getAutomationAlerts, runAutomationScan, resolveAutomationAlert } from "../../lib/api";
+ 
+-export default function AutomationPage(){
+-  const [alerts,setAlerts]=useState([]), [loading,setLoading]=useState(true), [scanning,setScanning]=useState(false), [error,setError]=useState(""), [status,setStatus]=useState("open");
+-  const load=async()=>{setLoading(true);setError("");try{const r=await getAutomationAlerts({status});setAlerts(r.alerts||[])}catch(e){setError(e.message||"Unable to load alerts.")}finally{setLoading(false)}};
+-  useEffect(()=>{load();},[status]);
+-  const scan=async()=>{setScanning(true);setError("");try{await runAutomationScan();await load()}catch(e){setError(e.message||"Scan failed.")}finally{setScanning(false)}};
+-  const resolve=async(id)=>{try{await resolveAutomationAlert(id);await load()}catch(e){setError(e.message||"Unable to resolve alert.")}};
+-  return <><Head><title>AI Automation | Waventra Vetric</title></Head><main style={styles.page}><div style={styles.header}><div><h1>AI Automation</h1><p>Live operational alerts generated from your database.</p></div><div style={styles.actions}><select value={status} onChange={e=>setStatus(e.target.value)} style={styles.select}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select><button onClick={scan} disabled={scanning} style={styles.button}>{scanning?"ScanningΓÇª":"Run Scan"}</button></div></div>{error&&<div style={styles.error}>{error}</div>}{loading?<div style={styles.card}>Loading alertsΓÇª</div>:alerts.length===0?<div style={styles.card}><h3>No alerts</h3><p>No matching operational signals were found.</p></div>:<div style={styles.grid}>{alerts.map(a=><div key={a._id} style={styles.card}><div style={styles.row}><span style={{...styles.badge,...(a.severity==="critical"?styles.critical:a.severity==="warning"?styles.warning:styles.info)}}>{a.severity.toUpperCase()}</span><span>{new Date(a.detectedAt).toLocaleString()}</span></div><h3>{a.title}</h3><p>{a.message}</p><small>Type: {a.type}</small>{a.status==="open"&&<button onClick={()=>resolve(a._id)} style={styles.resolve}>Mark resolved</button>}</div>)}</div>}<div style={styles.note}>Automation never blocks customers or orders automatically. Alerts are review signals based on live application data.</div></main></>;
++export default function AutomationPage() {
++  const [alerts, setAlerts] = useState([]);
++  const [loading, setLoading] = useState(true);
++  const [scanning, setScanning] = useState(false);
++  const [resolvingId, setResolvingId] = useState("");
++  const [error, setError] = useState("");
++  const [status, setStatus] = useState("open");
++
++  const load = async () => {
++    setLoading(true);
++    setError("");
++    try {
++      const result = await getAutomationAlerts({ status });
++      setAlerts(result.alerts || []);
++    } catch (e) {
++      setError(e.message || "Unable to load alerts.");
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  useEffect(() => { load(); }, [status]);
++
++  const scan = async () => {
++    setScanning(true);
++    setError("");
++    try {
++      await runAutomationScan();
++      await load();
++    } catch (e) {
++      setError(e.message || "Scan failed.");
++    } finally {
++      setScanning(false);
++    }
++  };
++
++  const resolve = async (id) => {
++    setResolvingId(id);
++    setError("");
++    try {
++      await resolveAutomationAlert(id);
++      await load();
++    } catch (e) {
++      setError(e.message || "Unable to mark this alert reviewed.");
++    } finally {
++      setResolvingId("");
++    }
++  };
++
++  return <>
++    <Head><title>AI Automation | Waventra Vetric</title></Head>
++    <main style={styles.page}>
++      <div style={styles.header}>
++        <div><h1>AI Automation</h1><p>Operational alerts generated from application data. Review before taking action.</p></div>
++        <div style={styles.actions}>
++          <select aria-label="Alert status" value={status} onChange={(e) => setStatus(e.target.value)} style={styles.select}>
++            <option value="open">Open</option><option value="resolved">Reviewed / resolved</option><option value="all">All</option>
++          </select>
++          <button onClick={scan} disabled={scanning} style={styles.button}>{scanning ? "Scanning..." : "Run Scan"}</button>
++        </div>
++      </div>
++      {error && <div role="alert" style={styles.error}>{error}</div>}
++      {loading ? <div style={styles.card}>Loading alerts...</div> : alerts.length === 0 ? <div style={styles.card}><h3>No alerts</h3><p>No matching operational signals were found.</p></div> :
++        <div style={styles.grid}>{alerts.map((alert) => <div key={alert._id} style={styles.card}>
++          <div style={styles.row}>
++            <span style={{ ...styles.badge, ...(alert.severity === "critical" ? styles.critical : alert.severity === "warning" ? styles.warning : styles.info) }}>{String(alert.severity || "info").toUpperCase()}</span>
++            <span>{alert.detectedAt ? new Date(alert.detectedAt).toLocaleString() : "Detection time unavailable"}</span>
++          </div>
++          <h3>{alert.title}</h3><p>{alert.message}</p><small>Type: {alert.type}</small>
++          {alert.type === "HIGH_RISK" && <p style={styles.reviewHint}>Risk signals are indicators for administrator review, not a finding of fraud.</p>}
++          {alert.status === "open" ? <button onClick={() => resolve(alert._id)} disabled={resolvingId === alert._id} style={styles.resolve}>{resolvingId === alert._id ? "Saving..." : "Mark reviewed & resolve"}</button> :
++            <div style={styles.resolved}>
++              <strong>Reviewed / resolved</strong>
++              <span>{alert.resolvedAt ? new Date(alert.resolvedAt).toLocaleString() : "Review time not recorded"}</span>
++              {alert.resolvedBy?.name && <span>By {alert.resolvedBy.name}</span>}
++            </div>}
++        </div>)}</div>}
++      <div style={styles.note}>Automation does not automatically block customers or orders. Alerts are review signals; the admin remains responsible for decisions.</div>
++    </main>
++  </>;
+ }
+-const styles={page:{minHeight:"100vh",padding:"32px",background:"#071126",color:"#eef4ff",fontFamily:"Inter,Arial,sans-serif"},header:{display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",marginBottom:24},actions:{display:"flex",gap:10},select:{padding:"11px 14px",borderRadius:10,background:"#101d38",color:"white",border:"1px solid #2a3d63"},button:{padding:"11px 16px",border:0,borderRadius:10,background:"#18c8e8",color:"#04101d",fontWeight:800,cursor:"pointer"},grid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:16},card:{background:"#0d1930",border:"1px solid #20365d",borderRadius:16,padding:20,boxShadow:"0 10px 30px rgba(0,0,0,.18)"},row:{display:"flex",justifyContent:"space-between",gap:12,fontSize:12,color:"#93a7c7"},badge:{padding:"5px 8px",borderRadius:999,fontWeight:800},critical:{background:"#4a1c2a",color:"#ff9cac"},warning:{background:"#463a17",color:"#ffd66b"},info:{background:"#163b4a",color:"#77e4ff"},resolve:{marginTop:14,padding:"9px 12px",borderRadius:8,border:"1px solid #36527e",background:"transparent",color:"#b9c9e4",cursor:"pointer"},error:{background:"#481d2a",color:"#ffb7c3",padding:14,borderRadius:10,marginBottom:16},note:{marginTop:24,color:"#7f94b8",fontSize:13}};
++
++const styles = {
++  page: { minHeight: "100vh", padding: "32px", background: "#071126", color: "#eef4ff", fontFamily: "Inter,Arial,sans-serif" },
++  header: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", flexWrap: "wrap", marginBottom: 24 },
++  actions: { display: "flex", gap: 10, flexWrap: "wrap" },
++  select: { padding: "11px 14px", borderRadius: 10, background: "#101d38", color: "white", border: "1px solid #2a3d63" },
++  button: { padding: "11px 16px", border: 0, borderRadius: 10, background: "#18c8e8", color: "#04101d", fontWeight: 800, cursor: "pointer" },
++  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 },
++  card: { background: "#0d1930", border: "1px solid #20365d", borderRadius: 16, padding: 20, boxShadow: "0 10px 30px rgba(0,0,0,.18)" },
++  row: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", fontSize: 12, color: "#93a7c7" },
++  badge: { padding: "5px 8px", borderRadius: 999, fontWeight: 800 },
++  critical: { background: "#4a1c2a", color: "#ff9cac" },
++  warning: { background: "#463a17", color: "#ffd66b" },
++  info: { background: "#163b4a", color: "#77e4ff" },
++  resolve: { marginTop: 14, padding: "9px 12px", borderRadius: 8, border: "1px solid #36527e", background: "#123047", color: "#b9e9f4", cursor: "pointer", fontWeight: 700 },
++  resolved: { marginTop: 14, padding: 12, display: "grid", gap: 5, borderRadius: 8, background: "#102b25", color: "#a7f3d0", fontSize: 13 },
++  reviewHint: { color: "#ffd66b", fontSize: 13 },
++  error: { background: "#481d2a", color: "#ffb7c3", padding: 14, borderRadius: 10, marginBottom: 16 },
++  note: { marginTop: 24, color: "#7f94b8", fontSize: 13 },
++};
+diff --git a/client/pages/admin/risk.js b/client/pages/admin/risk.js
+index 2f242fd..1895dbe 100644
+--- a/client/pages/admin/risk.js
++++ b/client/pages/admin/risk.js
+@@ -1,19 +1,140 @@
+-import {useEffect,useState} from "react";
++import { useEffect, useState } from "react";
+ import ProtectedRoute from "../../components/ProtectedRoute";
+-import {getRiskAnalysis,getRiskCustomer} from "../../lib/api";
+-
+-export default function Risk(){return <ProtectedRoute adminOnly><Inner/></ProtectedRoute>}
+-function Inner(){
+- const[d,setD]=useState(null),[loading,setLoading]=useState(true),[err,setErr]=useState(""),[days,setDays]=useState(30),[q,setQ]=useState(""),[customer,setCustomer]=useState(null),[customerLoading,setCustomerLoading]=useState(false);
+- const load=()=>{setLoading(true);setErr("");getRiskAnalysis({days}).then(setD).catch(e=>setErr(e.message)).finally(()=>setLoading(false))};
+- useEffect(() => { load(); }, [days]);
+- const lookup=async()=>{if(!q.trim())return;setCustomerLoading(true);try{setCustomer(await getRiskCustomer(q.trim()))}catch(e){setErr(e.message)}finally{setCustomerLoading(false)}};
+- return <main style={S.page}><div style={S.wrap}><div style={S.head}><div><span style={S.badge}>PHASE 18</span><h1>Risk & Anomaly Signals</h1><p>Rule-based signals to help administrators review unusual order patterns. These signals are not fraud determinations.</p></div><div><select value={days} onChange={e=>setDays(e.target.value)} style={S.select}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="180">180 days</option></select><button onClick={load} style={S.btn}>{loading?"CheckingΓÇª":"Refresh"}</button></div></div>
+- {err&&<div style={S.err}>{err}</div>}{d&&<><div style={S.stats}><Box t="Orders" v={d.summary.orders}/><Box t="Customers" v={d.summary.uniqueCustomers}/><Box t="Flagged" v={d.summary.flaggedCustomers}/><Box t="High risk" v={d.summary.highRisk}/><Box t="Medium risk" v={d.summary.mediumRisk}/><Box t="High-value orders" v={d.summary.highValueOrders}/></div>
+- <section style={S.panel}><h2>Customer signals</h2>{d.signals.length===0?<p>No rule-based signals were triggered in this period.</p>:<div style={S.tableWrap}><table style={S.table}><thead><tr><th>Customer key</th><th>Level</th><th>Score</th><th>Orders</th><th>Cancelled</th><th>Value</th><th>Signals</th></tr></thead><tbody>{d.signals.map(x=><tr key={x.key}><td>{x.key}</td><td><span style={badge(x.level)}>{x.level}</span></td><td>{x.score}</td><td>{x.orderCount}</td><td>{x.cancelledCount}</td><td>Γé╣{Number(x.totalValue).toLocaleString("en-IN")}</td><td>{x.reasons.join(" ΓÇó ")}</td></tr>)}</tbody></table></div>}</section>
+- <section style={S.panel}><h2>Review a customer</h2><div style={S.lookup}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Email, phone or user ID" style={S.input}/><button onClick={lookup} style={S.btn}>{customerLoading?"CheckingΓÇª":"Check customer"}</button></div>{customer&&<div style={S.customer}><strong>{customer.customer?.name||q}</strong><span>{customer.level} risk ┬╖ score {customer.score}</span><p>{customer.signals?.length?customer.signals.join(" ΓÇó "):"No rule-based customer signals."}</p><small>{customer.orders?.length||0} recent matching orders</small></div>}</section>
+- <section style={S.note}><b>Methodology:</b> {d.methodology} Thresholds: Γé╣{d.thresholds.highValueOrder.toLocaleString("en-IN")} high-value order, {d.thresholds.rapidOrderWindowMinutes}-minute rapid-order window.</section></>}</div></main>
++import { getRiskAnalysis, getRiskCustomer } from "../../lib/api";
++
++export default function Risk() {
++  return <ProtectedRoute adminOnly><Inner /></ProtectedRoute>;
+ }
+-function Box({t,v}){return <div style={S.box}><small>{t}</small><strong>{v}</strong></div>}
+-function badge(level){return {display:"inline-block",padding:"4px 9px",borderRadius:99,border:"1px solid #35506a",fontSize:12,fontWeight:800}}
+-const S={page:{minHeight:"90vh",background:"#07111f",color:"#eef6ff",padding:"38px 18px"},wrap:{maxWidth:1250,margin:"auto"},head:{display:"flex",justifyContent:"space-between",gap:20,alignItems:"flex-start",flexWrap:"wrap"},badge:{fontSize:12,letterSpacing:2,color:"#67e8f9"},headH:{},btn:{margin:"10px 0 0 8px",padding:"10px 15px",border:0,borderRadius:10,background:"#22d3ee",fontWeight:800,cursor:"pointer"},select:{padding:"10px",borderRadius:10,background:"#0d1b2d",color:"#eef6ff",border:"1px solid #29425c"},stats:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginTop:24},box:{background:"#0d1b2d",border:"1px solid #20364e",borderRadius:14,padding:17},boxSmall:{},boxStrong:{},panel:{background:"#0d1b2d",border:"1px solid #20364e",borderRadius:16,padding:20,marginTop:18},tableWrap:{overflowX:"auto"},table:{width:"100%",borderCollapse:"collapse",fontSize:13},lookup:{display:"flex",gap:10,flexWrap:"wrap"},input:{flex:"1 1 300px",padding:11,borderRadius:10,border:"1px solid #29425c",background:"#091726",color:"#eef6ff"},customer:{marginTop:14,padding:15,borderRadius:12,background:"#091726",display:"grid",gap:7},note:{marginTop:18,padding:14,borderRadius:12,border:"1px solid #29425c",color:"#b9c9d8",fontSize:13},err:{marginTop:15,padding:12,borderRadius:10,background:"#3b1117",color:"#fecaca"}}
++
++function Inner() {
++  const [data, setData] = useState(null);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState("");
++  const [days, setDays] = useState(30);
++  const [query, setQuery] = useState("");
++  const [customer, setCustomer] = useState(null);
++  const [customerLoading, setCustomerLoading] = useState(false);
++
++  const load = async () => {
++    setLoading(true);
++    setError("");
++    try {
++      setData(await getRiskAnalysis({ days }));
++    } catch (e) {
++      setError(e.message || "Unable to load risk analysis.");
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  useEffect(() => { load(); }, [days]);
++
++  const lookup = async (event) => {
++    if (event) event.preventDefault();
++    if (!query.trim()) return;
++    setCustomerLoading(true);
++    setError("");
++    try {
++      setCustomer(await getRiskCustomer(query.trim()));
++    } catch (e) {
++      setError(e.message || "Unable to check this customer.");
++    } finally {
++      setCustomerLoading(false);
++    }
++  };
++
++  return (
++    <main style={S.page}>
++      <div style={S.wrap}>
++        <div style={S.head}>
++          <div>
++            <span style={S.phase}>PHASE 18</span>
++            <h1>Risk &amp; Anomaly Signals</h1>
++            <p>Rule-based signals help administrators review unusual order patterns. A signal is not a fraud determination.</p>
++          </div>
++          <div>
++            <select aria-label="Analysis period" value={days} onChange={(e) => setDays(Number(e.target.value))} style={S.select}>
++              <option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option><option value={180}>180 days</option>
++            </select>
++            <button onClick={load} disabled={loading} style={S.btn}>{loading ? "Checking..." : "Refresh"}</button>
++          </div>
++        </div>
++
++        {error && <div role="alert" style={S.err}>{error}</div>}
++
++        {loading && !data ? <section style={S.panel}>Loading risk analysis...</section> : data && <>
++          <div style={S.stats}>
++            <Box title="Orders" value={data.summary.orders} />
++            <Box title="Customers" value={data.summary.uniqueCustomers} />
++            <Box title="Flagged" value={data.summary.flaggedCustomers} />
++            <Box title="High risk" value={data.summary.highRisk} />
++            <Box title="Medium risk" value={data.summary.mediumRisk} />
++            <Box title="High-value orders" value={data.summary.highValueOrders} />
++          </div>
++
++          <section style={S.panel}>
++            <h2>Customer signals</h2>
++            <p style={S.muted}>Customer identifiers are masked in this summary. Use the authorized customer lookup below when investigation is necessary.</p>
++            {data.signals.length === 0 ? <p>No rule-based signals were triggered in this period.</p> : <div style={S.tableWrap}>
++              <table style={S.table}>
++                <thead><tr><th>Masked customer</th><th>Level</th><th>Score</th><th>Orders</th><th>Cancelled</th><th>Value</th><th>Signals</th></tr></thead>
++                <tbody>{data.signals.map((item) => <tr key={item.id || item.key}>
++                  <td>{item.key}</td>
++                  <td><span style={riskBadge(item.level)}>{item.level}</span></td>
++                  <td>{item.score}</td><td>{item.orderCount}</td><td>{item.cancelledCount}</td>
++                  <td>Γé╣{Number(item.totalValue).toLocaleString("en-IN")}</td>
++                  <td>{item.reasons.join(" ┬╖ ")}</td>
++                </tr>)}</tbody>
++              </table>
++            </div>}
++          </section>
++
++          <section style={S.panel}>
++            <h2>Review a customer</h2>
++            <form onSubmit={lookup} style={S.lookup}>
++              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Email, phone or user ID" aria-label="Customer email, phone or user ID" style={S.input} />
++              <button type="submit" disabled={customerLoading || !query.trim()} style={S.btn}>{customerLoading ? "Checking..." : "Check customer"}</button>
++            </form>
++            {customer && <div style={S.customer}>
++              <strong>{customer.customer?.name || "Customer lookup result"}</strong>
++              <span>{customer.level} risk ┬╖ score {customer.score}</span>
++              <p>{customer.signals?.length ? customer.signals.join(" ┬╖ ") : "No rule-based customer signals."}</p>
++              <small>{customer.orders?.length || 0} matching recent orders (maximum 100)</small>
++            </div>}
++          </section>
++
++          <section style={S.note}><b>Methodology:</b> {data.methodology} Thresholds: Γé╣{Number(data.thresholds.highValueOrder).toLocaleString("en-IN")} high-value order; {data.thresholds.rapidOrderWindowMinutes}-minute rapid-order window. Signals should be reviewed by an administrator before action.</section>
++        </>}
++      </div>
++    </main>
++  );
++}
++
++function Box({ title, value }) {
++  return <div style={S.box}><small>{title}</small><strong>{value}</strong></div>;
++}
++
++function riskBadge(level) {
++  const colors = level === "High" ? { color: "#ff9cac", borderColor: "#773847" } : level === "Medium" ? { color: "#ffd66b", borderColor: "#6b5929" } : { color: "#9de7c1", borderColor: "#285f4a" };
++  return { display: "inline-block", padding: "4px 9px", borderRadius: 99, border: `1px solid ${colors.borderColor}`, color: colors.color, fontSize: 12, fontWeight: 800 };
++}
++
++const S = {
++  page: { minHeight: "90vh", background: "#07111f", color: "#eef6ff", padding: "38px 18px" },
++  wrap: { maxWidth: 1250, margin: "auto" },
++  head: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-start", flexWrap: "wrap" },
++  phase: { fontSize: 12, letterSpacing: 2, color: "#67e8f9" },
++  btn: { margin: "10px 0 0 8px", padding: "10px 15px", border: 0, borderRadius: 10, background: "#22d3ee", color: "#06202b", fontWeight: 800, cursor: "pointer" },
++  select: { padding: "10px", borderRadius: 10, background: "#0d1b2d", color: "#eef6ff", border: "1px solid #29425c" },
++  stats: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginTop: 24 },
++  box: { background: "#0d1b2d", border: "1px solid #20364e", borderRadius: 14, padding: 17, display: "grid", gap: 8 },
++  panel: { background: "#0d1b2d", border: "1px solid #20364e", borderRadius: 16, padding: 20, marginTop: 18 },
++  tableWrap: { overflowX: "auto" },
++  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
++  lookup: { display: "flex", gap: 10, flexWrap: "wrap" },
++  input: { flex: "1 1 300px", padding: 11, borderRadius: 10, border: "1px solid #29425c", background: "#091726", color: "#eef6ff" },
++  customer: { marginTop: 14, padding: 15, borderRadius: 12, background: "#091726", display: "grid", gap: 7 },
++  muted: { color: "#b9c9d8", fontSize: 13 },
++  note: { marginTop: 18, padding: 14, borderRadius: 12, border: "1px solid #29425c", color: "#b9c9d8", fontSize: 13 },
++  err: { marginTop: 15, padding: 12, borderRadius: 10, background: "#3b1117", color: "#fecaca" },
++};
+diff --git a/server/controllers/automationController.js b/server/controllers/automationController.js
+index c93ef15..4763b9e 100644
+--- a/server/controllers/automationController.js
++++ b/server/controllers/automationController.js
+@@ -1,23 +1,51 @@
+ const AutomationAlert = require("../models/AutomationAlert");
+ const { runAutomationScan } = require("../services/automationService");
+ 
+-const listAlerts = async (req,res,next) => {
++const listAlerts = async (req, res, next) => {
+   try {
+-    const limit = Math.min(Math.max(Number(req.query.limit)||50,1),100);
+-    const status = String(req.query.status||"open");
++    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
++    const status = String(req.query.status || "open");
+     const query = status === "all" ? {} : { status };
+-    const alerts = await AutomationAlert.find(query).sort({ detectedAt:-1 }).limit(limit).lean();
+-    res.json({success:true,alerts});
+-  } catch(e){ next(e); }
++    const alerts = await AutomationAlert.find(query)
++      .populate("resolvedBy", "name email")
++      .sort({ detectedAt: -1 })
++      .limit(limit)
++      .lean();
++    res.json({ success: true, alerts });
++  } catch (error) {
++    next(error);
++  }
+ };
+-const scan = async (req,res,next) => {
+-  try { res.json({success:true,...await runAutomationScan()}); } catch(e){ next(e); }
++
++const scan = async (req, res, next) => {
++  try {
++    res.json({ success: true, ...(await runAutomationScan()) });
++  } catch (error) {
++    next(error);
++  }
+ };
+-const resolveAlert = async (req,res,next) => {
++
++const resolveAlert = async (req, res, next) => {
+   try {
+-    const alert = await AutomationAlert.findByIdAndUpdate(req.params.id,{status:"resolved",resolvedAt:new Date(),resolvedBy:req.user._id},{new:true}).lean();
+-    if(!alert) return res.status(404).json({success:false,message:"Alert not found."});
+-    res.json({success:true,alert});
+-  } catch(e){ next(e); }
++    const alert = await AutomationAlert.findByIdAndUpdate(
++      req.params.id,
++      {
++        status: "resolved",
++        resolvedAt: new Date(),
++        resolvedBy: req.user._id,
++      },
++      { new: true, runValidators: true },
++    )
++      .populate("resolvedBy", "name email")
++      .lean();
++
++    if (!alert) {
++      return res.status(404).json({ success: false, message: "Alert not found." });
++    }
++    res.json({ success: true, alert });
++  } catch (error) {
++    next(error);
++  }
+ };
+-module.exports={listAlerts,scan,resolveAlert};
++
++module.exports = { listAlerts, scan, resolveAlert };
+diff --git a/server/controllers/riskController.js b/server/controllers/riskController.js
+index a6dbf4a..4c5f8cd 100644
+--- a/server/controllers/riskController.js
++++ b/server/controllers/riskController.js
+@@ -1,3 +1,4 @@
++const crypto = require("crypto");
+ const Order = require("../models/Order");
+ const User = require("../models/User");
+ 
+@@ -5,13 +6,122 @@ const DAYS = 30;
+ const HIGH_VALUE = 50000;
+ const RAPID_WINDOW_MIN = 30;
+ 
+-function safeEmail(value) { return String(value || "").trim().toLowerCase(); }
++function safeEmail(value) {
++  return String(value || "").trim().toLowerCase();
++}
++
++function normalizePhone(value) {
++  return String(value || "").replace(/\D/g, "");
++}
++
+ function keyFor(order) {
+   const email = safeEmail(order?.customer?.email || order?.shippingAddress?.email);
+-  const phone = String(order?.customer?.phone || order?.shippingAddress?.phone || "").replace(/\D/g, "");
++  const phone = normalizePhone(order?.customer?.phone || order?.shippingAddress?.phone);
+   return email || phone || String(order?.user || "unknown");
+ }
+-function riskLevel(score) { return score >= 70 ? "High" : score >= 40 ? "Medium" : "Low"; }
++
++function maskCustomerKey(value) {
++  const key = String(value || "");
++  if (key.includes("@")) {
++    const [local, ...domainParts] = key.split("@");
++    const domain = domainParts.join("@");
++    return `${local.slice(0, 1) || "*"}***@${domain}`;
++  }
++  const digits = normalizePhone(key);
++  if (digits.length >= 7) return `ΓÇóΓÇóΓÇóΓÇó ${digits.slice(-4)}`;
++  if (key.length > 4) return `Customer ΓÇóΓÇóΓÇóΓÇó${key.slice(-4)}`;
++  return "Customer (masked)";
++}
++
++function riskLevel(score) {
++  return score >= 70 ? "High" : score >= 40 ? "Medium" : "Low";
++}
++
++function scoreRiskGroup(list, days = DAYS) {
++  const cancelled = list.filter((o) => o.status === "Cancelled");
++  const valid = list.filter((o) => o.status !== "Cancelled");
++  const totalValue = valid.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
++  let score = 0;
++  const reasons = [];
++
++  if (list.length >= 5) {
++    score += 20;
++    reasons.push(`${list.length} orders in ${days} days`);
++  }
++  if (list.length >= 10) {
++    score += 15;
++    reasons.push("high order frequency");
++  }
++  if (cancelled.length >= 3) {
++    score += 20;
++    reasons.push(`${cancelled.length} cancelled orders`);
++  }
++  if (cancelled.length >= 5) {
++    score += 15;
++    reasons.push("repeated cancellations");
++  }
++  if (totalValue >= HIGH_VALUE) {
++    score += 20;
++    reasons.push(`Γé╣${Math.round(totalValue).toLocaleString("en-IN")} non-cancelled value`);
++  }
++
++  const sorted = [...list].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
++  let rapidPairs = 0;
++  for (let i = 1; i < sorted.length; i += 1) {
++    const interval = new Date(sorted[i].createdAt) - new Date(sorted[i - 1].createdAt);
++    if (interval >= 0 && interval <= RAPID_WINDOW_MIN * 60000) rapidPairs += 1;
++  }
++  if (rapidPairs >= 2) {
++    score += 15;
++    reasons.push(`${rapidPairs} rapid order intervals`);
++  }
++
++  return {
++    score: Math.min(score, 100),
++    cancelledCount: cancelled.length,
++    totalValue: Number(totalValue.toFixed(2)),
++    reasons,
++    rapidPairs,
++  };
++}
++
++function scoreCustomerOrders(orders) {
++  const cancelled = orders.filter((o) => o.status === "Cancelled").length;
++  const total = orders
++    .filter((o) => o.status !== "Cancelled")
++    .reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
++  let score = 0;
++  const reasons = [];
++
++  if (orders.length >= 5) {
++    score += 20;
++    reasons.push("high order frequency");
++  }
++  if (cancelled >= 3) {
++    score += 25;
++    reasons.push("repeated cancellations");
++  }
++  if (total >= HIGH_VALUE) {
++    score += 20;
++    reasons.push("high non-cancelled order value");
++  }
++  if (orders.some((o) => Number(o.totalPrice || 0) >= HIGH_VALUE)) {
++    score += 10;
++    reasons.push("high-value order present");
++  }
++
++  return { score: Math.min(score, 100), reasons };
++}
++
++function phoneRegexFor(value) {
++  let digits = normalizePhone(value);
++  if (digits.length < 7 || digits.length > 15) return null;
++  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
++  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
++  const sequence = digits.split("").join("\\D*");
++  const prefix = digits.length === 10 ? "(?:\\+?91\\D*)?(?:0\\D*)?" : "";
++  return new RegExp(`${prefix}${sequence}`);
++}
+ 
+ const getRiskAnalysis = async (req, res, next) => {
+   try {
+@@ -19,7 +129,9 @@ const getRiskAnalysis = async (req, res, next) => {
+     const since = new Date(Date.now() - days * 86400000);
+     const orders = await Order.find({ createdAt: { $gte: since } })
+       .select("user customer shippingAddress totalPrice status items createdAt cancellationReason")
+-      .sort({ createdAt: -1 }).limit(10000).lean();
++      .sort({ createdAt: -1 })
++      .limit(10000)
++      .lean();
+ 
+     const groups = new Map();
+     for (const order of orders) {
+@@ -29,62 +141,113 @@ const getRiskAnalysis = async (req, res, next) => {
+     }
+ 
+     const signals = [];
+-    for (const [key, list] of groups.entries()) {
+-      const cancelled = list.filter(o => o.status === "Cancelled");
+-      const valid = list.filter(o => o.status !== "Cancelled");
+-      const totalValue = valid.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
+-      let score = 0;
+-      const reasons = [];
+-      if (list.length >= 5) { score += 20; reasons.push(`${list.length} orders in ${days} days`); }
+-      if (list.length >= 10) { score += 15; reasons.push("high order frequency"); }
+-      if (cancelled.length >= 3) { score += 20; reasons.push(`${cancelled.length} cancelled orders`); }
+-      if (cancelled.length >= 5) { score += 15; reasons.push("repeated cancellations"); }
+-      if (totalValue >= HIGH_VALUE) { score += 20; reasons.push(`Γé╣${Math.round(totalValue).toLocaleString("en-IN")} non-cancelled value`); }
+-      const sorted = [...list].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+-      let rapidPairs = 0;
+-      for (let i = 1; i < sorted.length; i++) {
+-        if ((new Date(sorted[i].createdAt) - new Date(sorted[i-1].createdAt)) <= RAPID_WINDOW_MIN * 60000) rapidPairs++;
++    for (const [rawKey, list] of groups.entries()) {
++      const result = scoreRiskGroup(list, days);
++      if (result.score >= 20) {
++        signals.push({
++          id: crypto.createHash("sha256").update(rawKey).digest("hex").slice(0, 16),
++          key: maskCustomerKey(rawKey),
++          score: result.score,
++          level: riskLevel(result.score),
++          orderCount: list.length,
++          cancelledCount: result.cancelledCount,
++          totalValue: result.totalValue,
++          reasons: result.reasons,
++        });
+       }
+-      if (rapidPairs >= 2) { score += 15; reasons.push(`${rapidPairs} rapid order intervals`); }
+-      if (score >= 20) signals.push({ key, score: Math.min(score,100), level:riskLevel(score), orderCount:list.length, cancelledCount:cancelled.length, totalValue:Number(totalValue.toFixed(2)), reasons });
+     }
+ 
+-    signals.sort((a,b) => b.score - a.score || b.totalValue - a.totalValue);
+-    const high = signals.filter(x => x.level === "High").length;
+-    const medium = signals.filter(x => x.level === "Medium").length;
++    signals.sort((a, b) => b.score - a.score || b.totalValue - a.totalValue);
++    const high = signals.filter((x) => x.level === "High").length;
++    const medium = signals.filter((x) => x.level === "Medium").length;
+     const uniqueCustomers = groups.size;
+-    const cancelledOrders = orders.filter(o => o.status === "Cancelled").length;
+-    const highValueOrders = orders.filter(o => Number(o.totalPrice || 0) >= HIGH_VALUE).length;
++    const cancelledOrders = orders.filter((o) => o.status === "Cancelled").length;
++    const highValueOrders = orders.filter((o) => Number(o.totalPrice || 0) >= HIGH_VALUE).length;
+ 
+     res.json({
+-      success:true,
+-      generatedAt:new Date().toISOString(),
+-      methodology:"Rule-based risk signals only; not a fraud determination.",
+-      windowDays:days,
+-      summary:{orders:orders.length, uniqueCustomers, cancelledOrders, highValueOrders, flaggedCustomers:signals.length, highRisk:high, mediumRisk:medium},
+-      signals:signals.slice(0,100),
+-      thresholds:{highValueOrder:HIGH_VALUE, rapidOrderWindowMinutes:RAPID_WINDOW_MIN, minimumSignalScore:20}
++      success: true,
++      generatedAt: new Date().toISOString(),
++      methodology: "Rule-based risk signals only; not a fraud determination. Review signals before taking action.",
++      windowDays: days,
++      summary: {
++        orders: orders.length,
++        uniqueCustomers,
++        cancelledOrders,
++        highValueOrders,
++        flaggedCustomers: signals.length,
++        highRisk: high,
++        mediumRisk: medium,
++      },
++      signals: signals.slice(0, 100),
++      thresholds: {
++        highValueOrder: HIGH_VALUE,
++        rapidOrderWindowMinutes: RAPID_WINDOW_MIN,
++        minimumSignalScore: 20,
++      },
+     });
+-  } catch (e) { next(e); }
++  } catch (error) {
++    next(error);
++  }
+ };
+ 
+-const getRiskCustomer = async (req,res,next) => {
++const getRiskCustomer = async (req, res, next) => {
+   try {
+     const q = String(req.query.q || "").trim().toLowerCase();
+-    if (!q) return res.status(400).json({success:false,message:"Customer email, phone, or user ID is required."});
+-    const user = await User.findOne({$or:[{email:q},{_id:q}]}).select("name email phone role createdAt").lean().catch(()=>null);
+-    const orders = await Order.find({$or:[{"customer.email":q},{"shippingAddress.email":q},{"customer.phone":q},{"shippingAddress.phone":q}, ...(user? [{user:user._id}] : [])]})
+-      .select("totalPrice status items createdAt cancellationReason").sort({createdAt:-1}).limit(100).lean();
+-    if (!orders.length) return res.json({success:true, customer:user, orders:[], signals:[], score:0, level:"Low"});
+-    const cancelled=orders.filter(o=>o.status==="Cancelled").length;
+-    const total=orders.filter(o=>o.status!=="Cancelled").reduce((s,o)=>s+Number(o.totalPrice||0),0);
+-    let score=0; const reasons=[];
+-    if(orders.length>=5){score+=20;reasons.push("high order frequency")}
+-    if(cancelled>=3){score+=25;reasons.push("repeated cancellations")}
+-    if(total>=HIGH_VALUE){score+=20;reasons.push("high non-cancelled order value")}
+-    if(orders.some(o=>Number(o.totalPrice||0)>=HIGH_VALUE)){score+=10;reasons.push("high-value order present")}
+-    score=Math.min(score,100);
+-    res.json({success:true,customer:user,orders,score,level:riskLevel(score),signals:reasons});
+-  }catch(e){next(e)}
++    if (!q) {
++      return res.status(400).json({
++        success: false,
++        message: "Customer email, phone, or user ID is required.",
++      });
++    }
++
++    const user = await User.findOne({ $or: [{ email: q }, { _id: q }] })
++      .select("name email phone role createdAt")
++      .lean()
++      .catch(() => null);
++
++    const orderConditions = [{ "customer.email": q }, { "shippingAddress.email": q }];
++    const phoneRegex = phoneRegexFor(q);
++    if (phoneRegex) {
++      orderConditions.push(
++        { "customer.phone": { $regex: phoneRegex } },
++        { "shippingAddress.phone": { $regex: phoneRegex } },
++      );
++    }
++    if (user) orderConditions.push({ user: user._id });
++
++    const orders = await Order.find({ $or: orderConditions })
++      .select("totalPrice status items createdAt cancellationReason")
++      .sort({ createdAt: -1 })
++      .limit(100)
++      .lean();
++
++    if (!orders.length) {
++      return res.json({ success: true, customer: user, orders: [], signals: [], score: 0, level: "Low" });
++    }
++
++    const result = scoreCustomerOrders(orders);
++    return res.json({
++      success: true,
++      customer: user,
++      orders,
++      score: result.score,
++      level: riskLevel(result.score),
++      signals: result.reasons,
++    });
++  } catch (error) {
++    next(error);
++  }
++};
++
++module.exports = {
++  getRiskAnalysis,
++  getRiskCustomer,
++  // Export pure helpers so risk calculations can be tested without a live database.
++  riskLevel,
++  keyFor,
++  normalizePhone,
++  maskCustomerKey,
++  phoneRegexFor,
++  scoreRiskGroup,
++  scoreCustomerOrders,
+ };
+-module.exports={getRiskAnalysis,getRiskCustomer};
+diff --git a/server/tests/riskSignals.test.js b/server/tests/riskSignals.test.js
+index 8595c91..98fabb4 100644
+--- a/server/tests/riskSignals.test.js
++++ b/server/tests/riskSignals.test.js
+@@ -1,5 +1,94 @@
+-const test=require("node:test");
+-const assert=require("node:assert/strict");
+-function riskLevel(score){return score>=70?"High":score>=40?"Medium":"Low"}
+-test("risk levels use documented thresholds",()=>{assert.equal(riskLevel(0),"Low");assert.equal(riskLevel(40),"Medium");assert.equal(riskLevel(69),"Medium");assert.equal(riskLevel(70),"High")});
+-test("high value threshold is Γé╣50,000",()=>{const v=50000;assert.equal(v>=50000,true);assert.equal(49999>=50000,false)});
++const test = require("node:test");
++const assert = require("node:assert/strict");
++const {
++  riskLevel,
++  keyFor,
++  normalizePhone,
++  maskCustomerKey,
++  phoneRegexFor,
++  scoreRiskGroup,
++  scoreCustomerOrders,
++} = require("../controllers/riskController");
++
++test("risk levels use documented thresholds", () => {
++  assert.equal(riskLevel(0), "Low");
++  assert.equal(riskLevel(39), "Low");
++  assert.equal(riskLevel(40), "Medium");
++  assert.equal(riskLevel(69), "Medium");
++  assert.equal(riskLevel(70), "High");
++});
++
++test("high value threshold is Γé╣50,000", () => {
++  assert.equal(scoreRiskGroup([{ totalPrice: 50000, status: "Processing" }]).score, 20);
++  assert.equal(scoreRiskGroup([{ totalPrice: 49999, status: "Processing" }]).score, 0);
++});
++
++test("customer grouping prefers normalized email and otherwise normalized phone", () => {
++  assert.equal(keyFor({ customer: { email: " Buyer@Example.com " }, user: "u1" }), "buyer@example.com");
++  assert.equal(keyFor({ customer: { phone: "+91 98765-43210" } }), "919876543210");
++});
++
++test("phone normalization removes punctuation", () => {
++  assert.equal(normalizePhone("+91 (98765)-43210"), "919876543210");
++});
++
++test("risk table customer identifiers are masked", () => {
++  assert.equal(maskCustomerKey("mansoor@example.com"), "m***@example.com");
++  assert.equal(maskCustomerKey("919876543210"), "ΓÇóΓÇóΓÇóΓÇó 3210");
++  assert.notEqual(maskCustomerKey("mansoor@example.com"), "mansoor@example.com");
++});
++
++test("phone lookup regex matches common punctuation and optional India prefix", () => {
++  const regex = phoneRegexFor("9876543210");
++  assert.ok(regex.test("+91 98765-43210"));
++  assert.ok(regex.test("098765 43210"));
++  assert.equal(phoneRegexFor("123"), null);
++});
++
++test("five orders trigger frequency signal", () => {
++  const orders = Array.from({ length: 5 }, (_, i) => ({
++    status: "Processing",
++    totalPrice: 100,
++    createdAt: new Date(Date.UTC(2026, 0, 1 + i)),
++  }));
++  const result = scoreRiskGroup(orders, 30);
++  assert.equal(result.score, 20);
++  assert.ok(result.reasons.some((reason) => reason.includes("5 orders")));
++});
++
++test("three cancellations trigger cancellation signal", () => {
++  const orders = Array.from({ length: 3 }, (_, i) => ({
++    status: "Cancelled",
++    totalPrice: 100,
++    createdAt: new Date(Date.UTC(2026, 0, 1 + i)),
++  }));
++  const result = scoreRiskGroup(orders);
++  assert.equal(result.cancelledCount, 3);
++  assert.equal(result.score, 20);
++});
++
++test("two rapid intervals trigger rapid-order signal", () => {
++  const start = Date.UTC(2026, 0, 1, 10, 0, 0);
++  const orders = [0, 20, 40].map((minutes) => ({
++    status: "Processing",
++    totalPrice: 100,
++    createdAt: new Date(start + minutes * 60000),
++  }));
++  const result = scoreRiskGroup(orders);
++  assert.equal(result.rapidPairs, 2);
++  assert.equal(result.score, 15);
++});
++
++test("customer lookup score combines frequency, cancellations and high value", () => {
++  const orders = [
++    { status: "Cancelled", totalPrice: 100 },
++    { status: "Cancelled", totalPrice: 100 },
++    { status: "Cancelled", totalPrice: 100 },
++    { status: "Processing", totalPrice: 50000 },
++    { status: "Processing", totalPrice: 200 },
++  ];
++  const result = scoreCustomerOrders(orders);
++  assert.equal(result.score, 75);
++  assert.equal(riskLevel(result.score), "High");
++  assert.equal(result.reasons.length, 4);
++});

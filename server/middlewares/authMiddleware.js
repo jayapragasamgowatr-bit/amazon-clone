@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { hasPermission, isStaffRole } = require("../utils/permissions");
 
 // ============================================================
 // AUTHENTICATION MIDDLEWARE
@@ -84,6 +85,16 @@ const protect = async (req, res, next) => {
       });
     }
 
+    // Suspended accounts are signed out everywhere.
+    if (user.isBlocked) {
+      return res.status(401).json({
+        success: false,
+        code: "ACCOUNT_SUSPENDED",
+        message:
+          "This account has been suspended. Please contact support.",
+      });
+    }
+
     // Role is the authoritative admin permission.
     // Keep isAdmin synchronized for legacy compatibility.
     const shouldBeAdmin = user.role === "admin";
@@ -121,7 +132,7 @@ const optionalProtect = async (req, res, next) => {
     if (!decoded?.id) return next();
 
     const user = await User.findById(decoded.id).select("-password");
-    if (user) req.user = user;
+    if (user && !user.isBlocked) req.user = user;
   } catch {
     // Analytics must never turn an anonymous/customer request into an auth failure.
   }
@@ -152,6 +163,49 @@ const adminOnly = (req, res, next) => {
 };
 
 // ============================================================
+// STAFF PERMISSIONS
+// ============================================================
+// can("orders.manage") lets through every role that holds that
+// permission (see utils/permissions.js). Use after `protect`.
+
+const can = (permission) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: "Not authorized. Please login.",
+    });
+  }
+
+  if (!hasPermission(req.user.role, permission)) {
+    return res.status(403).json({
+      success: false,
+      message: "Your role does not have access to this action.",
+    });
+  }
+
+  next();
+};
+
+// Any staff role (support, inventory, manager, admin).
+const staffOnly = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: "Not authorized. Please login.",
+    });
+  }
+
+  if (!isStaffRole(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: "Staff access required.",
+    });
+  }
+
+  next();
+};
+
+// ============================================================
 // EXPORT
 // ============================================================
 
@@ -159,4 +213,6 @@ module.exports = {
   protect,
   optionalProtect,
   adminOnly,
+  can,
+  staffOnly,
 };

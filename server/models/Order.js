@@ -138,10 +138,41 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Amount taken off by a coupon. totalPrice = subtotal - discount + shipping.
+    discount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    coupon: {
+      code: { type: String, default: "", trim: true, uppercase: true, maxlength: 30 },
+      type: { type: String, default: "", trim: true, maxlength: 10 },
+      value: { type: Number, default: 0, min: 0 },
+    },
+
     totalPrice: {
       type: Number,
       required: true,
       min: 0,
+    },
+
+    // --------------------------------------------------------
+    // RETURN REQUEST (customer asks, staff decides)
+    // --------------------------------------------------------
+
+    returnRequest: {
+      status: {
+        type: String,
+        enum: ["None", "Requested", "Approved", "Rejected", "Refunded"],
+        default: "None",
+      },
+      reason: { type: String, default: "", trim: true, maxlength: 100 },
+      details: { type: String, default: "", trim: true, maxlength: 1000 },
+      requestedAt: { type: Date, default: null },
+      decidedAt: { type: Date, default: null },
+      decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      adminNote: { type: String, default: "", trim: true, maxlength: 500 },
     },
 
     // --------------------------------------------------------
@@ -264,6 +295,8 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ "returnRequest.status": 1, "returnRequest.requestedAt": -1 });
+orderSchema.index({ user: 1, "coupon.code": 1 });
 orderSchema.index({ "shipment.trackingNumber": 1 });
 
 // ============================================================

@@ -364,7 +364,7 @@ export default function AdminUsersPage() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute adminOnly>
         <div className="loading">
           <div className="loader" />
           <strong>Loading customers...</strong>
@@ -396,7 +396,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main className="page">
         <div className="shell">
           <header className="header">

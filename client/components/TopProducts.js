@@ -4,7 +4,7 @@ export default function TopProducts({ products = [] }) {
   return (
     <div className="glass-card" style={{ padding: "28px" }}>
       <h2 style={{ fontSize: "28px", marginBottom: "24px" }}>
-        Top Products 🔥
+        Top products
       </h2>
       <div style={{ display: "grid", gap: "18px" }}>
         {products.slice(0, 5).map((product) => (

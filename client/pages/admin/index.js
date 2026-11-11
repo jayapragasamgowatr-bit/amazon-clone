@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { hasPermission } from "../../lib/permissions";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import toast from "react-hot-toast";
@@ -87,8 +88,8 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (user.isAdmin !== true && user.role !== "admin") {
-      toast.error("Admin access only");
+    if (!hasPermission(user, "analytics.view")) {
+      toast.error("Your role does not have access to this page");
       router.replace("/");
     }
   }, [authLoading, user, router]);
@@ -636,7 +637,7 @@ export default function AdminDashboard() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute adminOnly>
         <div className="dashboard-loading">
           <div className="loader" />
           <strong>Loading dashboard...</strong>
@@ -677,7 +678,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main className="dashboard-page">
         <div className="dashboard-shell">
           <header className="dashboard-header">

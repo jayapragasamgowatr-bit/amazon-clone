@@ -38,7 +38,7 @@ async function getCustomerDashboard(req,res,next){
 async function semanticSearch(req,res,next){
   try {
     const q=String(req.query.q||"").trim(); if(!q) return res.json({success:true,query:"",results:[]});
-    const terms=tokenize(q); const products=await Product.find({isActive:true}).limit(1000).lean();
+    const terms=tokenize(q); const products=await Product.find({isActive:{$ne:false}}).select("-reviews").limit(1000).lean();
     const results=products.map(p=>{const tokens=tokenize(productText(p)); let score=0; for(const t of terms){if(tokens.includes(t))score+=5; if(tokens.some(x=>x.startsWith(t)))score+=2; if(productText(p).toLowerCase().includes(t))score+=1;} if(terms.some(t=>String(p.category||"").toLowerCase().includes(t)))score+=4; return {...p,semanticScore:score};}).filter(p=>p.semanticScore>0).sort((a,b)=>b.semanticScore-a.semanticScore||Number(b.rating||0)-Number(a.rating||0)).slice(0,24);
     res.json({success:true,query:q,results});
   }catch(e){next(e)}

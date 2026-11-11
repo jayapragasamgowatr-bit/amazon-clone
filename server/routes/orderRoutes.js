@@ -28,7 +28,9 @@ const {
 const {
   protect,
   adminOnly,
+  can,
 } = require("../middlewares/authMiddleware");
+const { audit } = require("../middlewares/auditMiddleware");
 
 
 // ============================================================
@@ -63,7 +65,7 @@ router.get(
 router.get(
   "/",
   protect,
-  adminOnly,
+  can("orders.view"),
   getAllOrders
 );
 
@@ -77,7 +79,7 @@ router.get(
 router.get(
   "/admin/analytics",
   protect,
-  adminOnly,
+  can("analytics.view"),
   getAdminAnalytics
 );
 
@@ -89,7 +91,7 @@ router.get(
 router.get(
   "/admin/advanced-analytics",
   protect,
-  adminOnly,
+  can("analytics.view"),
   getAdvancedAnalytics
 );
 
@@ -99,14 +101,15 @@ router.get(
 router.get(
   "/admin/shipping",
   protect,
-  adminOnly,
+  can("orders.view"),
   getAdminShippingOrders
 );
 
 router.put(
   "/admin/shipping/:id",
   protect,
-  adminOnly,
+  can("orders.manage"),
+  audit("order.shipping", "Order"),
   updateShippingDetails
 );
 
@@ -131,7 +134,8 @@ router.get(
 router.put(
   "/:id/status",
   protect,
-  adminOnly,
+  can("orders.manage"),
+  audit("order.status", "Order"),
   updateOrderStatus
 );
 
@@ -145,6 +149,7 @@ router.delete(
   "/:id",
   protect,
   adminOnly,
+  audit("order.delete", "Order"),
   deleteOrder
 );
 

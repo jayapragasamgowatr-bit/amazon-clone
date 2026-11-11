@@ -48,7 +48,7 @@ function Inner() {
       <div style={S.wrap}>
         <div style={S.head}>
           <div>
-            <span style={S.phase}>PHASE 18</span>
+            <span style={S.phase}>RISK SIGNALS</span>
             <h1>Risk &amp; Anomaly Signals</h1>
             <p>Rule-based signals help administrators review unusual order patterns. A signal is not a fraud determination.</p>
           </div>
@@ -120,15 +120,15 @@ function riskBadge(level) {
 }
 
 const S = {
-  page: { minHeight: "90vh", background: "#07111f", color: "#eef6ff", padding: "38px 18px" },
+  page: { minHeight: "90vh", background: "transparent", color: "#eef6ff", padding: "38px 18px" },
   wrap: { maxWidth: 1250, margin: "auto" },
   head: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-start", flexWrap: "wrap" },
   phase: { fontSize: 12, letterSpacing: 2, color: "#67e8f9" },
   btn: { margin: "10px 0 0 8px", padding: "10px 15px", border: 0, borderRadius: 10, background: "#22d3ee", color: "#06202b", fontWeight: 800, cursor: "pointer" },
-  select: { padding: "10px", borderRadius: 10, background: "#0d1b2d", color: "#eef6ff", border: "1px solid #29425c" },
+  select: { padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.06)", color: "#eef6ff", border: "1px solid #29425c" },
   stats: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginTop: 24 },
-  box: { background: "#0d1b2d", border: "1px solid #20364e", borderRadius: 14, padding: 17, display: "grid", gap: 8 },
-  panel: { background: "#0d1b2d", border: "1px solid #20364e", borderRadius: 16, padding: 20, marginTop: 18 },
+  box: { background: "rgba(255,255,255,0.06)", border: "1px solid #20364e", borderRadius: 14, padding: 17, display: "grid", gap: 8 },
+  panel: { background: "rgba(255,255,255,0.06)", border: "1px solid #20364e", borderRadius: 16, padding: 20, marginTop: 18 },
   tableWrap: { overflowX: "auto" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
   lookup: { display: "flex", gap: 10, flexWrap: "wrap" },

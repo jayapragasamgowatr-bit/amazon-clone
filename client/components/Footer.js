@@ -54,11 +54,9 @@ export default function Footer() {
               lineHeight: "1.7",
             }}
           >
-            Premium ecommerce
-            shopping experience
-            with modern design,
-            fast checkout, and
-            beautiful UI.
+            Smart water measurement and monitoring
+            products, with secure checkout, order
+            tracking and AI-assisted product selection.
           </p>
         </div>
 
@@ -94,6 +92,23 @@ export default function Footer() {
           />
         </div>
 
+        {/* AI TOOLS */}
+
+        <div>
+          <h3
+            style={{
+              marginBottom: "15px",
+            }}
+          >
+            AI Tools
+          </h3>
+
+          <FooterLink href="/assistant" label="AI Assistant" />
+          <FooterLink href="/semantic-search" label="Smart Search" />
+          <FooterLink href="/compare" label="Compare Products" />
+          <FooterLink href="/ai-support" label="AI Support" />
+        </div>
+
         {/* ACCOUNT */}
         <div>
           <h3
@@ -116,9 +131,11 @@ export default function Footer() {
           />
 
           <FooterLink
-            href="/profile"
+            href="/account"
             label="Profile"
           />
+          <FooterLink href="/dashboard" label="My Dashboard" />
+          <FooterLink href="/notifications" label="Notifications" />
         </div>
 
         {/* SUPPORT */}
@@ -132,6 +149,10 @@ export default function Footer() {
             Support
           </h3>
 
+          <FooterLink href="/about" label="About us" />
+          <FooterLink href="/faq" label="FAQ" />
+          <FooterLink href="/shipping-policy" label="Shipping" />
+          <FooterLink href="/returns-policy" label="Returns" />
           <FooterLink
             href="/help-center"
             label="Help Center"
@@ -167,9 +188,8 @@ export default function Footer() {
           opacity: 0.65,
         }}
       >
-        © 2026 Waventra Vetric.
-        Built with Next.js +
-        Node.js + MongoDB.
+        © {new Date().getFullYear()} Waventra Vetric.
+        All rights reserved.
       </div>
     </footer>
   );

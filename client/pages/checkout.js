@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { createOrder } from "../lib/api";
 import SEO from "../components/SEO";
 import { trackEvent } from "../lib/eventTracker";
+import { CouponBox, SavedAddressPicker } from "../components/CheckoutExtras";
 
 // ============================================================
 // CHECKOUT PAGE
@@ -186,9 +187,32 @@ export default function CheckoutPage() {
 
   const shipping = 0;
 
+  // Coupon preview. The server recalculates the discount when the order is placed.
+  const [coupon, setCoupon] = useState(null);
+
+  // If the cart changes, the previewed discount may no longer be right.
+  useEffect(() => {
+    setCoupon(null);
+  }, [subtotal]);
+
+  const discount = coupon
+    ? Math.min(Number(coupon.discount || 0), subtotal)
+    : 0;
+
   const total =
-    subtotal +
-    shipping;
+    subtotal - discount + shipping;
+
+  const fillFromSavedAddress = (saved) => {
+    setForm((previous) => ({
+      ...previous,
+      name: saved.name || previous.name,
+      phone: saved.phone || previous.phone,
+      address: saved.address || "",
+      city: saved.city || "",
+      state: saved.state || "",
+      postalCode: saved.postalCode || "",
+    }));
+  };
 
   // ==========================================================
   // SUBMIT
@@ -383,6 +407,7 @@ export default function CheckoutPage() {
 
           paymentMethod:
             "COD",
+              couponCode: coupon?.code || undefined,
         };
 
         // ====================================================
@@ -422,7 +447,7 @@ export default function CheckoutPage() {
         // ====================================================
 
         toast.success(
-          "Order placed successfully! 🎉"
+          "Order placed successfully"
         );
 
         trackEvent("checkout_completed", { metadata: { source: "checkout" } });
@@ -553,7 +578,7 @@ export default function CheckoutPage() {
           }}
         >
           <h1>
-            Your Cart is Empty 🛒
+            Your cart is empty
           </h1>
 
           <p
@@ -720,6 +745,8 @@ export default function CheckoutPage() {
             your order should be
             delivered.
           </p>
+
+          <SavedAddressPicker onPick={fillFromSavedAddress} />
 
           {/* NAME */}
 
@@ -992,7 +1019,7 @@ export default function CheckoutPage() {
           >
             {processing
               ? "Placing Order..."
-              : "Place Order 🛒"}
+              : "Place order"}
           </button>
         </motion.form>
 
@@ -1163,6 +1190,12 @@ export default function CheckoutPage() {
             }}
           />
 
+          {/* COUPON */}
+
+
+          <CouponBox subtotal={subtotal} applied={coupon} onChange={setCoupon} />
+
+
           {/* SUBTOTAL */}
 
           <div
@@ -1200,6 +1233,31 @@ export default function CheckoutPage() {
               Free
             </span>
           </div>
+
+          {discount > 0 && (
+
+            <div
+
+              style={{
+
+                ...summaryRow,
+
+                marginTop: "12px",
+
+                color: "#86efac",
+
+              }}
+
+            >
+
+              <span>Coupon ({coupon.code})</span>
+
+              <span>- ₹{discount.toLocaleString("en-IN")}</span>
+
+            </div>
+
+          )}
+
 
           <hr
             style={{
@@ -1269,7 +1327,7 @@ export default function CheckoutPage() {
                 0.85,
             }}
           >
-            📧 Customer email:
+            Customer email:
 
             <strong>
               {" "}

@@ -39,7 +39,7 @@ const HomePage = dynamic(
               fontWeight: 800,
             }}
           >
-            Loading WaterOS...
+            Loading Waventra Vetric...
           </h2>
 
           <p

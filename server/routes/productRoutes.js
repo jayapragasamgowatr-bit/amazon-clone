@@ -34,8 +34,9 @@ const { getDemandForecast } = require("../controllers/forecastController");
 
 const {
   protect,
-  adminOnly,
+  can,
 } = require("../middlewares/authMiddleware");
+const { audit } = require("../middlewares/auditMiddleware");
 const { uploadProductImages, validateImageSignature } = require("../middlewares/uploadMiddleware");
 
 // ============================================================
@@ -58,7 +59,7 @@ router.get(
 router.get(
   "/admin/list",
   protect,
-  adminOnly,
+  can("products.manage"),
   getAdminProducts
 );
 
@@ -66,7 +67,8 @@ router.get(
 router.put(
   "/admin/:id/stock",
   protect,
-  adminOnly,
+  can("inventory.manage"),
+  audit("inventory.adjust", "Product"),
   updateProductStock
 );
 
@@ -74,7 +76,7 @@ router.put(
 router.get(
   "/admin/demand-forecast",
   protect,
-  adminOnly,
+  can("analytics.view"),
   getDemandForecast
 );
 
@@ -82,7 +84,7 @@ router.get(
 router.get(
   "/admin/inventory",
   protect,
-  adminOnly,
+  can("inventory.manage"),
   getInventory
 );
 
@@ -90,7 +92,7 @@ router.get(
 router.get(
   "/admin/inventory/history",
   protect,
-  adminOnly,
+  can("inventory.manage"),
   getInventoryHistory
 );
 
@@ -99,7 +101,8 @@ router.get(
 router.post(
   "/:id/images",
   protect,
-  adminOnly,
+  can("products.manage"),
+  audit("product.images", "Product"),
   uploadProductImages,
   validateImageSignature,
   uploadProductImagesController
@@ -119,7 +122,8 @@ router.get(
 router.post(
   "/",
   protect,
-  adminOnly,
+  can("products.manage"),
+  audit("product.create", "Product"),
   createProduct
 );
 
@@ -127,7 +131,8 @@ router.post(
 router.put(
   "/:id",
   protect,
-  adminOnly,
+  can("products.manage"),
+  audit("product.update", "Product"),
   updateProduct
 );
 
@@ -135,7 +140,8 @@ router.put(
 router.delete(
   "/:id",
   protect,
-  adminOnly,
+  can("products.manage"),
+  audit("product.delete", "Product"),
   deleteProduct
 );
 
@@ -154,7 +160,8 @@ router.post(
 router.put(
   "/:id/reviews/:reviewId",
   protect,
-  adminOnly,
+  can("products.manage"),
+  audit("review.update", "Product"),
   updateProductReview
 );
 
@@ -162,7 +169,8 @@ router.put(
 router.delete(
   "/:id/reviews/:reviewId",
   protect,
-  adminOnly,
+  can("products.manage"),
+  audit("review.delete", "Product"),
   deleteProductReview
 );
 

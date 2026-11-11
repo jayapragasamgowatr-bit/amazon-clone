@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const { ROLES, isValidRole } = require("../utils/permissions");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { EMAIL_RE, validateRegistration } = require("../utils/validation");
@@ -185,6 +186,17 @@ const loginUser = async (req, res, next) => {
     }
 
     // --------------------------------------------------------
+    // SUSPENDED ACCOUNTS CANNOT SIGN IN
+    // --------------------------------------------------------
+
+    if (user.isBlocked) {
+      res.status(403);
+      throw new Error(
+        "This account has been suspended. Please contact support."
+      );
+    }
+
+    // --------------------------------------------------------
     // SYNCHRONIZE ADMIN FLAG
     // --------------------------------------------------------
 
@@ -365,7 +377,7 @@ const resetPassword = async (req, res, next) => {
 const getUsers = async (req, res, next) => {
   try {
     const users = await User.find({})
-      .select("-password")
+      .select("-password -resetPasswordToken -resetPasswordExpires -pushSubscriptions")
       .sort({
         createdAt: -1,
       });
@@ -389,7 +401,7 @@ const getUserById = async (req, res, next) => {
   try {
     const user = await User.findById(
       req.params.id
-    ).select("-password");
+    ).select("-password -resetPasswordToken -resetPasswordExpires -pushSubscriptions");
 
     if (!user) {
       res.status(404);
@@ -523,14 +535,10 @@ const updateUserRole = async (req, res, next) => {
     // VALIDATE ROLE
     // --------------------------------------------------------
 
-    if (
-      role !== "admin" &&
-      role !== "user"
-    ) {
+    if (!isValidRole(role)) {
       res.status(400);
-
       throw new Error(
-        "Invalid role. Use user or admin."
+        `Invalid role. Use one of: ${ROLES.join(", ")}.`
       );
     }
 

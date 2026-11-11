@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { apiFetch } from "../../lib/api";
 import { motion } from "framer-motion";
+import AICopyAssistant from "../../components/AICopyAssistant";
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -31,6 +32,50 @@ export default function AddProductPage() {
 
   const [loading, setLoading] =
     useState(false);
+
+  // --------------------------------------------------
+  // FEATURES / APPLICATIONS (one per line)
+  // --------------------------------------------------
+
+  const [featuresText, setFeaturesText] =
+    useState("");
+
+  const [applicationsText, setApplicationsText] =
+    useState("");
+
+  const toLines = (text) =>
+    String(text || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 50);
+
+  const specificationsForAI = () => {
+    const result = {};
+    specifications.forEach((spec) => {
+      const key = spec.key.trim();
+      const value = spec.value.trim();
+      if (key && value) result[key] = value;
+    });
+    return result;
+  };
+
+  // Copy an AI draft into the form. Nothing is saved until the form is submitted.
+  const applyAICopy = (copy) => {
+    setFormData((prev) => ({
+      ...prev,
+      description:
+        copy.description || prev.description,
+    }));
+
+    if (copy.features?.length) {
+      setFeaturesText(copy.features.join("\n"));
+    }
+
+    if (copy.applications?.length) {
+      setApplicationsText(copy.applications.join("\n"));
+    }
+  };
 
   // --------------------------------------------------
   // HANDLE FORM CHANGE
@@ -208,6 +253,12 @@ export default function AddProductPage() {
 
             specifications:
               specificationObject,
+
+            features:
+              toLines(featuresText),
+
+            applications:
+              toLines(applicationsText),
           }),
         }
       );
@@ -238,7 +289,7 @@ export default function AddProductPage() {
   // --------------------------------------------------
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
 
       <div
         style={{
@@ -277,7 +328,7 @@ export default function AddProductPage() {
                 "center",
             }}
           >
-            Add New Product 📦
+            Add a new product
           </h1>
 
           <form
@@ -336,6 +387,42 @@ export default function AddProductPage() {
                 handleChange
               }
               required
+            />
+
+            {/* AI LISTING WRITER */}
+
+            <AICopyAssistant
+              details={{
+                name: formData.name,
+                category: formData.category,
+                description: formData.description,
+                specifications: specificationsForAI(),
+              }}
+              onApply={applyAICopy}
+            />
+
+            {/* FEATURES */}
+
+            <textarea
+              name="features"
+              placeholder="Key features (one per line)"
+              rows="4"
+              value={featuresText}
+              onChange={(e) =>
+                setFeaturesText(e.target.value)
+              }
+            />
+
+            {/* APPLICATIONS */}
+
+            <textarea
+              name="applications"
+              placeholder="Applications / use cases (one per line)"
+              rows="3"
+              value={applicationsText}
+              onChange={(e) =>
+                setApplicationsText(e.target.value)
+              }
             />
 
             {/* IMAGE URL */}

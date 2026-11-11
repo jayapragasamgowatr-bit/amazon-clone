@@ -159,22 +159,80 @@ const chat = async ({
     throw err;
   }
 
-  if (c.provider === "gemini") {
-    return chatGemini({
-      system,
-      user,
-      temperature,
-      maxTokens,
-      previousInteractionId,
-    });
-  }
+  const run = () =>
+    c.provider === "gemini"
+      ? chatGemini({
+          system,
+          user,
+          temperature,
+          maxTokens,
+          previousInteractionId,
+        })
+      : chatOpenAICompatible({
+          system,
+          user,
+          temperature,
+          maxTokens,
+        });
 
-  return chatOpenAICompatible({
-    system,
-    user,
-    temperature,
-    maxTokens,
-  });
+  // One automatic retry for transient provider failures
+  // (rate limit, gateway error, timeout). Configuration errors are not retried.
+  try {
+    return await run();
+  } catch (error) {
+    const transient = [429, 502, 504].includes(error?.statusCode);
+    const authFailure = /api key|permission|unauthori[sz]ed|forbidden/i.test(
+      String(error?.message || "")
+    );
+    if (!transient || authFailure) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    return run();
+  }
 };
 
-module.exports = { chat, isConfigured, getConfig };
+// Pull the first JSON object/array out of a model reply.
+// Models often wrap JSON in ```json fences or add a sentence around it.
+const parseJsonReply = (text) => {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+
+  const unfenced = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const candidates = [unfenced];
+  const firstObject = unfenced.indexOf("{");
+  const lastObject = unfenced.lastIndexOf("}");
+  if (firstObject !== -1 && lastObject > firstObject) {
+    candidates.push(unfenced.slice(firstObject, lastObject + 1));
+  }
+  const firstArray = unfenced.indexOf("[");
+  const lastArray = unfenced.lastIndexOf("]");
+  if (firstArray !== -1 && lastArray > firstArray) {
+    candidates.push(unfenced.slice(firstArray, lastArray + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // try the next candidate
+    }
+  }
+  return null;
+};
+
+// Ask for a JSON answer. Returns { data, text, model, provider };
+// data is null when the reply could not be parsed, so callers can fall back.
+const chatJson = async (options) => {
+  const result = await chat({
+    ...options,
+    system:
+      `${options.system}\n\nReply with a single valid JSON value only. ` +
+      `No markdown fences, no commentary before or after the JSON.`,
+  });
+  return { ...result, data: parseJsonReply(result.text) };
+};
+
+module.exports = { chat, chatJson, parseJsonReply, isConfigured, getConfig };

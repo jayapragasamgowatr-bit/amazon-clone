@@ -1,3 +1,4 @@
+import { hasPermission } from "../../lib/permissions";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
@@ -125,8 +126,8 @@ export default function AdminProducts() {
       return;
     }
 
-    if (user.isAdmin !== true && user.role !== "admin") {
-      toast.error("Admin access only");
+    if (!hasPermission(user, "products.manage")) {
+      toast.error("Your role does not have access to this page");
       router.replace("/");
       return;
     }

@@ -92,7 +92,7 @@ export default function Dashboard() {
         </div>
 
         <style jsx>{`
-          .dashboard-page{min-height:calc(100vh - 90px);background:linear-gradient(135deg,#07111f 0%,#10172d 52%,#102c3d 100%);color:#f8fafc;padding:42px 0 80px}
+          .dashboard-page{min-height:calc(100vh - 90px);background:transparent;color:#f8fafc;padding:42px 0 80px}
           .dashboard-shell{width:min(1240px,calc(100% - 48px));margin:0 auto}
           .hero{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;padding:10px 0 30px;border-bottom:1px solid rgba(148,163,184,.14)}
           .eyebrow,.section-kicker{font-size:11px;letter-spacing:.16em;font-weight:800;color:#38bdf8}

@@ -176,7 +176,7 @@ export default function Products() {
       toast.success(
         current
           ? "Removed from wishlist"
-          : "Added to wishlist ❤️"
+          : "Added to wishlist"
       );
     } catch (error) {
       console.error(

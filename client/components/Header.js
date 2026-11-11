@@ -18,6 +18,7 @@ import useCartStore from "../store/cartStore";
 import { useWishlist } from "../context/WishlistContext";
 import { useAuth } from "../context/AuthContext";
 import { getProductSuggestions } from "../lib/api";
+import { homeFor, isStaff } from "../lib/permissions";
 
 export default function Header() {
   const router = useRouter();
@@ -44,10 +45,10 @@ export default function Header() {
     ? wishlist.length
     : 0;
 
-  const isAdmin =
-    user?.role === "admin" ||
-    user?.isAdmin === true ||
-    user?.isAdmin === 1;
+  // Any staff role sees the Admin link; it opens the first
+  // section that role is allowed to use.
+  const isAdmin = isStaff(user);
+  const adminHome = isAdmin ? homeFor(user) : "/admin";
 
   useEffect(() => {
     setMobileOpen(false);
@@ -127,7 +128,7 @@ export default function Header() {
                 aria-label="Search products"
               />
               {search && (
-                <button type="button" className="wv-search-clear" onClick={() => { setSearch(""); setSuggestions([]); }}>
+                <button type="button" className="wv-search-clear" aria-label="Clear search" onClick={() => { setSearch(""); setSuggestions([]); }}>
                   <CloseIcon size={15} />
                 </button>
               )}
@@ -182,6 +183,7 @@ export default function Header() {
             <Link
               href="/cart"
               className="wv-nav-link wv-icon-link"
+              aria-label={`Cart${cartCount > 0 ? `, ${cartCount} item${cartCount === 1 ? "" : "s"}` : ""}`}
             >
               <ShoppingCart size={20} />
 
@@ -203,17 +205,17 @@ export default function Header() {
 
             {user && (
               <Link
-                href="/profile"
+                href="/account"
                 className="wv-nav-link"
               >
                 <User size={18} />
-                Profile
+                Account
               </Link>
             )}
 
             {isAdmin && (
               <Link
-                href="/admin"
+                href={adminHome}
                 className="wv-nav-link"
               >
                 <Shield size={18} />
@@ -256,6 +258,8 @@ export default function Header() {
           <button
             type="button"
             className="wv-mobile-button"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
             onClick={() =>
               setMobileOpen((value) => !value)
             }
@@ -285,6 +289,14 @@ export default function Header() {
               ✦ AI Assistant
             </Link>
 
+            <Link href="/semantic-search">
+              Smart Search
+            </Link>
+
+            <Link href="/compare">
+              Compare Products
+            </Link>
+
             <Link href="/wishlist">
               Wishlist
               {wishlistCount > 0 &&
@@ -304,13 +316,13 @@ export default function Header() {
             )}
 
             {user && (
-              <Link href="/profile">
-                Profile
+              <Link href="/account">
+                Account
               </Link>
             )}
 
             {isAdmin && (
-              <Link href="/admin">
+              <Link href={adminHome}>
                 Admin Dashboard
               </Link>
             )}
@@ -711,17 +723,7 @@ export default function Header() {
             font-size: 25px;
           }
 
-          .wv-search-wrap { position:relative; flex:1; max-width:390px; }
-        .wv-search { display:flex; align-items:center; gap:9px; padding:10px 12px; border:1px solid rgba(255,255,255,.12); border-radius:13px; background:rgba(255,255,255,.06); color:#94a3b8; }
-        .wv-search input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:#fff; font-size:14px; }
-        .wv-search input::placeholder { color:#94a3b8; }
-        .wv-search-clear { border:0; background:transparent; color:#94a3b8; cursor:pointer; display:flex; }
-        .wv-suggestions { position:absolute; top:calc(100% + 8px); left:0; right:0; padding:7px; border:1px solid rgba(255,255,255,.1); border-radius:14px; background:#0b1228; box-shadow:0 18px 45px rgba(0,0,0,.4); z-index:100000; }
-        .wv-suggestions a,.wv-suggestions button { width:100%; display:flex; align-items:center; gap:9px; padding:10px; border:0; border-radius:9px; background:transparent; color:#fff; text-align:left; cursor:pointer; font-size:13px; }
-        .wv-suggestions a:hover,.wv-suggestions button:hover { background:rgba(255,255,255,.07); color:#38bdf8; }
-        .wv-suggestions button { color:#38bdf8; font-weight:800; margin-top:3px; }
-
-        .wv-nav {
+          .wv-nav {
             display: none;
           }
 

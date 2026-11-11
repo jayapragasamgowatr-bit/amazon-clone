@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import toast from "react-hot-toast";
 import ProtectedRoute from "../../../components/ProtectedRoute";
+import AICopyAssistant from "../../../components/AICopyAssistant";
 import { apiFetch } from "../../../lib/api";
 import { motion } from "framer-motion";
 
@@ -209,7 +210,7 @@ export default function EditProductPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute adminOnly>
         <div style={{ maxWidth: 900, margin: "80px auto", padding: 20, textAlign: "center" }}>
           <div className="glass-card" style={{ padding: 40 }}><h2>Loading product...</h2></div>
         </div>
@@ -218,12 +219,12 @@ export default function EditProductPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <main style={{ minHeight: "100vh", padding: "40px 20px 80px" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: 40, borderRadius: 24 }}>
             <div style={{ marginBottom: 30 }}>
-              <h1 style={{ fontSize: 42, margin: 0, marginBottom: 8, fontWeight: 900 }}>Edit Product ✏️</h1>
+              <h1 style={{ fontSize: 42, margin: 0, marginBottom: 8, fontWeight: 900 }}>Edit product</h1>
               <p style={{ opacity: 0.65, margin: 0 }}>Update product information, gallery images and technical specifications.</p>
             </div>
 
@@ -247,6 +248,26 @@ export default function EditProductPage() {
               <Field label="Description">
                 <textarea name="description" value={formData.description} onChange={handleChange} rows={7} required style={{ ...inputStyle, resize: "vertical", minHeight: 150 }} />
               </Field>
+
+              <AICopyAssistant
+                applyLabel="Use this description"
+                details={{
+                  name: formData.name,
+                  category: formData.category,
+                  description: formData.description,
+                  specifications: Object.fromEntries(
+                    specifications
+                      .map((spec) => [String(spec.key || "").trim(), String(spec.value || "").trim()])
+                      .filter(([key, value]) => key && value)
+                  ),
+                }}
+                onApply={(copy) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: copy.description || prev.description,
+                  }))
+                }
+              />
 
               <section style={sectionStyle}>
                 <div style={sectionHeaderStyle}>

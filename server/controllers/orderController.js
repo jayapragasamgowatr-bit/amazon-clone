@@ -14,6 +14,9 @@ const {
   canTransitionStatus,
   shouldRestoreStockOnCancellation,
 } = require("../utils/orderRules");
+const { redeemCouponForOrder } = require("./couponController");
+const { round2 } = require("../utils/couponRules");
+const { hasPermission } = require("../utils/permissions");
 
 const MAX_ITEM_QUANTITY = 100;
 
@@ -86,7 +89,7 @@ const createOrder = async (req, res) => {
       });
     }
 
-    const { items, shippingAddress, customer } = req.body || {};
+    const { items, shippingAddress, customer, couponCode } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
@@ -391,8 +394,27 @@ const createOrder = async (req, res) => {
 
       const shipping = 0;
 
-      const totalPrice =
-        subtotal + shipping;
+      /*
+       * Coupon (optional). Validated against the subtotal that was
+       * just calculated from live product prices, and one use is
+       * reserved inside this same transaction.
+       */
+      const appliedCoupon = couponCode
+        ? await redeemCouponForOrder({
+            code: couponCode,
+            subtotal,
+            userId,
+            session,
+          })
+        : null;
+
+      const discount = appliedCoupon
+        ? appliedCoupon.discount
+        : 0;
+
+      const totalPrice = round2(
+        Math.max(0, subtotal - discount + shipping)
+      );
 
       /*
        * Create the order in the SAME transaction.
@@ -429,6 +451,22 @@ const createOrder = async (req, res) => {
               subtotal,
 
               shipping,
+
+              discount,
+
+              coupon: appliedCoupon
+
+                ? {
+
+                    code: appliedCoupon.code,
+
+                    type: appliedCoupon.type,
+
+                    value: appliedCoupon.value,
+
+                  }
+
+                : undefined,
 
               totalPrice,
 
@@ -1137,9 +1175,11 @@ const getOrderById = async (
       });
     }
 
-    const isAdmin =
-      req.user?.role ===
-      "admin";
+    // Staff who may view orders can open any order.
+    const isAdmin = hasPermission(
+      req.user?.role,
+      "orders.view"
+    );
 
     if (
       !isAdmin &&

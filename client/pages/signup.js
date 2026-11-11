@@ -43,7 +43,7 @@ export default function SignupPage() {
       login(data.user, data.token);
 
       toast.success(
-        "Account created successfully 🎉"
+        "Account created successfully"
       );
 
       if (data.user?.isAdmin) {
@@ -96,7 +96,7 @@ export default function SignupPage() {
             marginBottom: "10px",
           }}
         >
-          Create Account ✨
+          Create your account
         </h1>
 
         <p

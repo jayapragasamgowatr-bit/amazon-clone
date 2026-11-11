@@ -1,5 +1,5 @@
 const express=require("express");
-const {optionalProtect,protect,adminOnly}=require("../middlewares/authMiddleware");
+const {optionalProtect,protect,can}=require("../middlewares/authMiddleware");
 const {createRateLimiter}=require("../middlewares/rateLimitMiddleware");
 const {getAssistant}=require("../controllers/aiAssistantController");
 const {getAssistantSuggestions}=require("../controllers/assistantSuggestionsController");
@@ -10,9 +10,9 @@ const {getAiSearchIntelligence}=require("../controllers/aiSearchIntelligenceCont
 const router=express.Router();
 router.get("/assistant/suggestions",createRateLimiter({windowMs:60000,max:30,message:"Too many suggestion requests."}),getAssistantSuggestions);
 router.post("/assistant",optionalProtect,createRateLimiter({windowMs:60000,max:30,message:"Too many assistant requests."}),getAssistant);
-router.get("/admin/copilot",protect,adminOnly,getCopilot);
-router.get("/admin/customer/:userId",protect,adminOnly,getCustomerAI);
-router.get("/admin/business-intelligence",protect,adminOnly,getBusinessIntelligence);
-router.get("/admin/search-intelligence",protect,adminOnly,getAiSearchIntelligence);
-router.post("/admin/business-intelligence/ask",protect,adminOnly,askBusinessIntelligence);
+router.get("/admin/copilot",protect,can("analytics.view"),getCopilot);
+router.get("/admin/customer/:userId",protect,can("analytics.view"),getCustomerAI);
+router.get("/admin/business-intelligence",protect,can("analytics.view"),getBusinessIntelligence);
+router.get("/admin/search-intelligence",protect,can("analytics.view"),getAiSearchIntelligence);
+router.post("/admin/business-intelligence/ask",protect,can("analytics.view"),askBusinessIntelligence);
 module.exports=router;

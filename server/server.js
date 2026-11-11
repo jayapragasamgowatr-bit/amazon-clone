@@ -30,6 +30,12 @@ const authenticityRoutes = require("./routes/authenticityRoutes");
 const automationRoutes = require("./routes/automationRoutes");
 const supportRoutes = require("./routes/supportRoutes");
 const advancedFeatureRoutes = require("./routes/advancedFeatureRoutes");
+const aiStudioRoutes = require("./routes/aiStudioRoutes");
+const orderExtrasRoutes = require("./routes/orderExtrasRoutes");
+const couponRoutes = require("./routes/couponRoutes");
+const accountRoutes = require("./routes/accountRoutes");
+const staffRoutes = require("./routes/staffRoutes");
+const questionRoutes = require("./routes/questionRoutes");
 
 const {
   runAutomationScan,
@@ -80,6 +86,37 @@ app.use(securityHeaders);
 
 /*
 |--------------------------------------------------------------------------
+| CORS Middleware
+|--------------------------------------------------------------------------
+*/
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow server-to-server requests
+      // and local tooling with no Origin header.
+      if (
+        !origin ||
+        allowedOrigins.includes(origin)
+      ) {
+        return callback(null, true);
+      }
+
+      const corsError = new Error(
+        "CORS origin not allowed"
+      );
+      corsError.statusCode = 403;
+
+      return callback(corsError);
+    },
+
+    credentials: true,
+  })
+);
+
+
+/*
+|--------------------------------------------------------------------------
 | Rate Limiting
 |--------------------------------------------------------------------------
 */
@@ -121,34 +158,6 @@ app.use(
     max: 180,
     message:
       "Too many API requests. Please try again later.",
-  })
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| CORS Middleware
-|--------------------------------------------------------------------------
-*/
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Allow server-to-server requests
-      // and local tooling with no Origin header.
-      if (
-        !origin ||
-        allowedOrigins.includes(origin)
-      ) {
-        return callback(null, true);
-      }
-
-      return callback(
-        new Error("CORS origin not allowed")
-      );
-    },
-
-    credentials: true,
   })
 );
 
@@ -242,9 +251,38 @@ app.use(
   authRoutes
 );
 
+// Customer cancel / return requests and the staff returns desk.
+// Registered first so "/admin/returns" and "/meta/..." are matched here.
+app.use(
+  "/api/orders",
+  orderExtrasRoutes
+);
+
 app.use(
   "/api/orders",
   orderRoutes
+);
+
+app.use(
+  "/api/coupons",
+  couponRoutes
+);
+
+app.use(
+  "/api/account",
+  accountRoutes
+);
+
+// Product questions and answers.
+app.use(
+  "/api/questions",
+  questionRoutes
+);
+
+// Staff roles, account suspension and the activity log.
+app.use(
+  "/api/admin",
+  staffRoutes
 );
 
 app.use(
@@ -277,6 +315,13 @@ app.use(
   aiRoutes
 );
 
+// Customer-facing and admin AI tools (chat, product Q&A,
+// review summaries, compare, smart search, copywriting).
+app.use(
+  "/api/ai",
+  aiStudioRoutes
+);
+
 app.use(
   "/api/risk",
   riskRoutes
@@ -303,13 +348,17 @@ app.use(
 );
 
 
+app.use(
+  "/api/advanced",
+  advancedFeatureRoutes
+);
+
+
 /*
 |--------------------------------------------------------------------------
 | 404 Handler
 |--------------------------------------------------------------------------
 */
-
-app.use("/api/advanced", advancedFeatureRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -332,6 +381,17 @@ app.use(
       req.requestId || "no-request-id",
       err?.message || err
     );
+
+    // Many controllers call res.status(4xx) and then throw.
+    // Honour that status instead of answering 500.
+    if (
+      err &&
+      !err.statusCode &&
+      res.statusCode >= 400 &&
+      res.statusCode < 500
+    ) {
+      err.statusCode = res.statusCode;
+    }
 
     if (err?.statusCode) {
       return res.status(
@@ -615,6 +675,12 @@ const startServer = async () => {
           `${signal} received. Shutting down...`
         );
 
+        // Do not hang forever on keep-alive connections.
+        setTimeout(
+          () => process.exit(1),
+          10000
+        ).unref();
+
         server.close(
           async () => {
 
@@ -650,6 +716,28 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+
+/*
+|--------------------------------------------------------------------------
+| Process Safety Nets
+|--------------------------------------------------------------------------
+|
+| Log unexpected async failures instead of letting them pass silently.
+|--------------------------------------------------------------------------
+*/
+
+process.on("unhandledRejection", (reason) => {
+  console.error(
+    "UNHANDLED REJECTION:",
+    reason?.message || reason
+  );
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("UNCAUGHT EXCEPTION:", error);
+  process.exit(1);
+});
 
 
 /*

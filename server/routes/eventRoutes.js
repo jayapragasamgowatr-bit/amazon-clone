@@ -1,6 +1,6 @@
 const express = require("express");
 const { createRateLimiter } = require("../middlewares/rateLimitMiddleware");
-const { protect, optionalProtect, adminOnly } = require("../middlewares/authMiddleware");
+const { protect, optionalProtect, can } = require("../middlewares/authMiddleware");
 const { createEvent, getEventAnalytics } = require("../controllers/eventController");
 
 const router = express.Router();
@@ -16,6 +16,6 @@ router.post(
   createEvent
 );
 
-router.get("/admin/analytics", protect, adminOnly, getEventAnalytics);
+router.get("/admin/analytics", protect, can("analytics.view"), getEventAnalytics);
 
 module.exports = router;

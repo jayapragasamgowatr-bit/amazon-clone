@@ -122,7 +122,7 @@ export default function CartPage() {
           fontWeight: "800",
         }}
       >
-        Shopping Cart 🛒
+        Shopping cart
       </motion.h1>
 
       <div

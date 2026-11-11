@@ -1,8 +1,8 @@
 const express = require('express');
-const { protect, adminOnly } = require('../middlewares/authMiddleware');
+const { protect, can } = require('../middlewares/authMiddleware');
 const { registerAuthenticity, verifyAuthenticity, getLedger } = require('../controllers/authenticityController');
 const router = express.Router();
 router.get('/verify/:id', verifyAuthenticity);
-router.get('/admin/ledger', protect, adminOnly, getLedger);
-router.post('/admin/register/:id', protect, adminOnly, registerAuthenticity);
+router.get('/admin/ledger', protect, can("analytics.view"), getLedger);
+router.post('/admin/register/:id', protect, can("products.manage"), registerAuthenticity);
 module.exports = router;

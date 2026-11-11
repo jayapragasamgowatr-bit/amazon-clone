@@ -22,6 +22,7 @@ import {
 
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { getOrderById } from "../../lib/api";
+import OrderActions from "../../components/OrderActions";
 
 const STEPS = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered"];
 
@@ -182,7 +183,7 @@ export default function OrderDetailsPage() {
             .page {
               min-height: 100vh;
               padding: 50px 20px;
-              background: #070b20;
+              background: transparent;
               color: white;
             }
             .empty {
@@ -261,6 +262,9 @@ export default function OrderDetailsPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Cancel, return, invoice */}
+          <OrderActions order={order} onChanged={loadOrder} />
 
           <section className="tracking-card">
             <div className="section-heading">
@@ -464,6 +468,9 @@ export default function OrderDetailsPage() {
 
               <div className="totals">
                 <div><span>Subtotal</span><strong>{money(totals.subtotal)}</strong></div>
+                {Number(order?.discount) > 0 && (
+                  <div><span>Coupon{order?.coupon?.code ? ` (${order.coupon.code})` : ""}</span><strong>- {money(order.discount)}</strong></div>
+                )}
                 <div><span>Shipping</span><strong>{totals.shipping ? money(totals.shipping) : "Free"}</strong></div>
                 <div className="grand"><span>Total</span><strong>{money(totals.total)}</strong></div>
               </div>

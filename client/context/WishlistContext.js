@@ -103,11 +103,6 @@ export function WishlistProvider({
           const data =
             await getWishlist();
 
-          console.log(
-            "WISHLIST RESPONSE:",
-            data
-          );
-
           const list =
             normalizeWishlist(
               data
@@ -119,26 +114,20 @@ export function WishlistProvider({
 
         } catch (error) {
 
-          console.error(
-            "FETCH WISHLIST ERROR:",
-            error
-          );
+          // An expired or invalid session is an expected situation,
+          // not a crash: clear the wishlist quietly and carry on.
+          const sessionEnded =
+            /token|authorized|session|expired|login/i.test(
+              error?.message || ""
+            );
 
-          // If token is invalid,
-          // don't keep broken wishlist state.
-          if (
-            error?.message
-              ?.toLowerCase()
-              .includes(
-                "token"
-              ) ||
-            error?.message
-              ?.toLowerCase()
-              .includes(
-                "authorized"
-              )
-          ) {
+          if (sessionEnded) {
             setWishlist([]);
+          } else {
+            console.warn(
+              "FETCH WISHLIST ERROR:",
+              error?.message || error
+            );
           }
 
           return [];

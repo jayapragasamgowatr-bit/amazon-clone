@@ -5,6 +5,8 @@ import { WishlistProvider } from "../context/WishlistContext";
 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import AIChatWidget from "../components/AIChatWidget";
+import AdminNav from "../components/AdminNav";
 
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
@@ -24,6 +26,9 @@ export default function App({ Component, pageProps }) {
       <WishlistProvider>
         <Header />
 
+        {/* Section menu for staff, filtered by role */}
+        {router.pathname.startsWith("/admin") && <AdminNav />}
+
         <main
           style={{
             minHeight: "calc(100vh - 80px)",
@@ -33,6 +38,9 @@ export default function App({ Component, pageProps }) {
         </main>
 
         <Footer />
+
+        {/* Vetra: AI shopping assistant available on every store page */}
+        <AIChatWidget />
 
         <Toaster
           position="top-right"
