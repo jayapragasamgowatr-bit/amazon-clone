@@ -1927,10 +1927,7 @@ export default function AdminProducts() {
         .admin-products-page {
           min-height: 100vh;
           padding: 34px 28px 80px;
-          background:
-            radial-gradient(circle at 8% 8%, rgba(124, 58, 237, 0.20), transparent 28%),
-            radial-gradient(circle at 92% 16%, rgba(6, 182, 212, 0.16), transparent 30%),
-            linear-gradient(135deg, #090f22 0%, #151331 48%, #092b3b 100%);
+          background: transparent;
           color: #f8fafc;
         }
 

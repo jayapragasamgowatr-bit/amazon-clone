@@ -1,3 +1,12 @@
+# Round 3 (wishlist layout, one background everywhere)
+
+- Wishlist cards now match the product grid: fixed image area, equal card heights, buttons lined up along the bottom.
+- 11 more pages (admin dashboard, orders, products, inventory, reviews, customers, analytics, catalogue intelligence,
+  business intelligence, and the customer Orders page) no longer paint their own background, so every page shows the
+  same background as the home page.
+
+---
+
 # Waventra Vetric: round 2 (roles, coupons, returns, Q&A, account, content, theme)
 
 Extract `client/` and `server/` over `D:\Waventravetric` (keep a copy of the old folders first), then restart both terminals.

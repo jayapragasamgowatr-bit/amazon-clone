@@ -1435,23 +1435,7 @@ const styles = `
       Dark navy + purple + teal
     */
 
-    background:
-      radial-gradient(
-        circle at 10% 20%,
-        rgba(91, 45, 150, 0.25),
-        transparent 35%
-      ),
-      radial-gradient(
-        circle at 90% 30%,
-        rgba(0, 180, 220, 0.18),
-        transparent 35%
-      ),
-      linear-gradient(
-        110deg,
-        #0c1026 0%,
-        #17132f 48%,
-        #0b3042 100%
-      );
+    background: transparent;
 
     color: #ffffff;
   }

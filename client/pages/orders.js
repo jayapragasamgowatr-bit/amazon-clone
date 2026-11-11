@@ -493,18 +493,7 @@ export default function OrdersPage() {
           .orders-page {
             min-height: 100vh;
             padding: 48px 20px 80px;
-            background:
-              radial-gradient(
-                circle at 10% 10%,
-                rgba(124, 58, 237, 0.28),
-                transparent 30%
-              ),
-              radial-gradient(
-                circle at 90% 20%,
-                rgba(6, 182, 212, 0.20),
-                transparent 30%
-              ),
-              #06091f;
+            background: transparent;
             color: #fff;
           }
 

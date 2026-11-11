@@ -460,7 +460,7 @@ export default function CatalogueIntelligencePage() {
       </main>
 
       <style jsx>{`
-        .page{min-height:100vh;padding:32px; background:radial-gradient(circle at 15% 0%,rgba(34,211,238,.07),transparent 32%),#050b16;color:#e7eef8}
+        .page{min-height:100vh;padding:32px; background: transparent;color:#e7eef8}
         .header{max-width:1250px;margin:0 auto 24px;display:flex;justify-content:space-between;gap:24px;align-items:flex-end}
         .back{display:inline-flex;align-items:center;gap:6px;color:#7dd3fc;text-decoration:none;font-size:12px;margin-bottom:20px}
         .eyebrow{display:flex;align-items:center;gap:7px;color:#67e8f9;font-size:10px;font-weight:900;letter-spacing:.14em}
